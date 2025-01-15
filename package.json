@@ -1,0 +1,12 @@
+{
+  "devDependencies": {
+    "@types/node": "^22.7.3"
+  },
+  "scripts": {
+    "start": "ts-node examples/simple_decoder.ts"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
