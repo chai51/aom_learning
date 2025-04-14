@@ -1,8 +1,79 @@
 import { Array3D, Clip1, Clip3, integer, Round2 } from "../Conventions";
-import * as AV1 from "../define";
+import { FILTER_BITS, MI_SIZE, SUPERRES_EXTRA_BITS, SUPERRES_FILTER_OFFSET, SUPERRES_FILTER_TAPS, SUPERRES_SCALE_BITS, SUPERRES_SCALE_MASK } from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { assert } from "console";
+
+/**
+ * 7.16 Upscaling process
+ *
+ * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#cdef-process)
+ */
+export class Upscaling {
+  private decoder: AV1Decoder;
+
+  constructor(d: AV1Decoder) {
+    this.decoder = d;
+  }
+
+  /**
+   * 7.16 Upscaling process
+   *
+   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#cdef-process)
+   */
+  upscaling(frame: number[][][]) {
+    const seqHeader = this.decoder.sequenceHeaderObu.sequenceHeader;
+    const cc = seqHeader.color_config;
+    const fh = this.decoder.frameHeaderObu.frameHeader;
+    const fs = fh.frame_size;
+    const fswr = fh.frame_size_with_refs;
+    const sp = fh.superres_params;
+    const cis = fh.compute_image_size;
+
+    if (sp.use_superres == 0) {
+      return frame;
+    }
+
+    let outputFrame: number[][][] = Array3D(cc.NumPlanes, Round2(fs.FrameHeight, fswr.UpscaledWidth));
+    for (let plane = 0; plane < cc.NumPlanes; plane++) {
+      let subX = 0;
+      let subY = 0;
+      if (plane > 0) {
+        subX = cc.subsampling_x;
+        subY = cc.subsampling_y;
+      }
+      let downscaledPlaneW = Round2(fs.FrameWidth, subX);
+      let upscaledPlaneW = Round2(fswr.UpscaledWidth, subX);
+      assert(upscaledPlaneW > downscaledPlaneW, "that upscaledPlaneW is strictly greater than downscaledPlaneW");
+      let planeH = Round2(fs.FrameHeight, subY);
+      let stepX = integer(((downscaledPlaneW << SUPERRES_SCALE_BITS) + integer(upscaledPlaneW / 2)) / upscaledPlaneW);
+      let err = upscaledPlaneW * stepX - (downscaledPlaneW << SUPERRES_SCALE_BITS);
+      let initialSubpelX =
+        integer((-((upscaledPlaneW - downscaledPlaneW) << (SUPERRES_SCALE_BITS - 1)) + integer(upscaledPlaneW / 2)) / upscaledPlaneW) +
+        (1 << (SUPERRES_EXTRA_BITS - 1)) -
+        integer(err / 2);
+      initialSubpelX &= SUPERRES_SCALE_MASK;
+      let miW = cis.MiCols >> subX;
+      let minX = 0;
+      let maxX = miW * MI_SIZE - 1;
+      for (let y = 0; y < planeH; y++) {
+        for (let x = 0; x < upscaledPlaneW; x++) {
+          let srcX = -(1 << SUPERRES_SCALE_BITS) + initialSubpelX + x * stepX;
+          let srcXPx = srcX >> SUPERRES_SCALE_BITS;
+          let srcXSubpel = (srcX & SUPERRES_SCALE_MASK) >> SUPERRES_EXTRA_BITS;
+          let sum = 0;
+          for (let k = 0; k < SUPERRES_FILTER_TAPS; k++) {
+            let sampleX = Clip3(minX, maxX, srcXPx + (k - SUPERRES_FILTER_OFFSET));
+            let px = frame[plane][y][sampleX];
+            sum += px * Upscale_Filter[srcXSubpel][k];
+          }
+          outputFrame[plane][y][x] = Clip1(Round2(sum, FILTER_BITS), cc.BitDepth);
+        }
+      }
+    }
+    return outputFrame;
+  }
+}
 
 const Upscale_Filter = [
   [0, 0, 0, 128, 0, 0, 0, 0],
@@ -70,74 +141,3 @@ const Upscale_Filter = [
   [0, 1, -2, 4, 127, -3, 1, 0],
   [0, 0, -1, 2, 128, -1, 0, 0],
 ];
-
-/**
- * 7.16 Upscaling process
- *
- * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#cdef-process)
- */
-export class Upscaling {
-  private decoder: AV1Decoder;
-
-  constructor(d: AV1Decoder) {
-    this.decoder = d;
-  }
-
-  /**
-   * 7.16 Upscaling process
-   *
-   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#cdef-process)
-   */
-  upscaling(frame: number[][][]) {
-    const seqHeader = this.decoder.sequenceHeaderObu.sequenceHeader;
-    const cc = seqHeader.color_config;
-    const fh = this.decoder.frameHeaderObu.frameHeader;
-    const fs = fh.frame_size;
-    const fswr = fh.frame_size_with_refs;
-    const sp = fh.superres_params;
-    const cis = fh.compute_image_size;
-
-    if (sp.use_superres == 0) {
-      return frame;
-    }
-
-    let outputFrame: number[][][] = Array3D(cc.NumPlanes, Round2(fs.FrameHeight, fswr.UpscaledWidth));
-    for (let plane = 0; plane < cc.NumPlanes; plane++) {
-      let subX = 0;
-      let subY = 0;
-      if (plane > 0) {
-        subX = cc.subsampling_x;
-        subY = cc.subsampling_y;
-      }
-      let downscaledPlaneW = Round2(fs.FrameWidth, subX);
-      let upscaledPlaneW = Round2(fswr.UpscaledWidth, subX);
-      assert(upscaledPlaneW > downscaledPlaneW, "that upscaledPlaneW is strictly greater than downscaledPlaneW");
-      let planeH = Round2(fs.FrameHeight, subY);
-      let stepX = integer(((downscaledPlaneW << AV1.SUPERRES_SCALE_BITS) + integer(upscaledPlaneW / 2)) / upscaledPlaneW);
-      let err = upscaledPlaneW * stepX - (downscaledPlaneW << AV1.SUPERRES_SCALE_BITS);
-      let initialSubpelX =
-        integer((-((upscaledPlaneW - downscaledPlaneW) << (AV1.SUPERRES_SCALE_BITS - 1)) + integer(upscaledPlaneW / 2)) / upscaledPlaneW) +
-        (1 << (AV1.SUPERRES_EXTRA_BITS - 1)) -
-        integer(err / 2);
-      initialSubpelX &= AV1.SUPERRES_SCALE_MASK;
-      let miW = cis.MiCols >> subX;
-      let minX = 0;
-      let maxX = miW * AV1.MI_SIZE - 1;
-      for (let y = 0; y < planeH; y++) {
-        for (let x = 0; x < upscaledPlaneW; x++) {
-          let srcX = -(1 << AV1.SUPERRES_SCALE_BITS) + initialSubpelX + x * stepX;
-          let srcXPx = srcX >> AV1.SUPERRES_SCALE_BITS;
-          let srcXSubpel = (srcX & AV1.SUPERRES_SCALE_MASK) >> AV1.SUPERRES_EXTRA_BITS;
-          let sum = 0;
-          for (let k = 0; k < AV1.SUPERRES_FILTER_TAPS; k++) {
-            let sampleX = Clip3(minX, maxX, srcXPx + (k - AV1.SUPERRES_FILTER_OFFSET));
-            let px = frame[plane][y][sampleX];
-            sum += px * Upscale_Filter[srcXSubpel][k];
-          }
-          outputFrame[plane][y][x] = Clip1(Round2(sum, AV1.FILTER_BITS), cc.BitDepth);
-        }
-      }
-    }
-    return outputFrame;
-  }
-}

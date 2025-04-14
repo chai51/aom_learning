@@ -1,5 +1,5 @@
 import { Array2D, Array3D } from "../Conventions";
-import * as AV1 from "../define";
+import { REFMVS_LIMIT } from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { REF_FRAME } from "../SyntaxStructures/Semantics";
@@ -65,7 +65,7 @@ export class MotionFieldMotionVectorStorage {
             if (dist < 0) {
               let mvRow = db.Mvs[row][col][list][0];
               let mvCol = db.Mvs[row][col][list][1];
-              if (Math.abs(mvRow) <= AV1.REFMVS_LIMIT && Math.abs(mvCol) <= AV1.REFMVS_LIMIT) {
+              if (Math.abs(mvRow) <= REFMVS_LIMIT && Math.abs(mvCol) <= REFMVS_LIMIT) {
                 this.MfRefFrames[row][col] = r;
                 this.MfMvs[row][col][0] = mvRow;
                 this.MfMvs[row][col][1] = mvCol;

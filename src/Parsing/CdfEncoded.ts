@@ -1,7 +1,6 @@
-import * as AV1 from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
-import { COMP_REF_TYPE, PARTITION, REF_FRAME, SET, SUB_SIZE, TX_SIZE, UV_MODE } from "../SyntaxStructures/Semantics";
+import { COMP_REF_TYPE, PARTITION, REF_FRAME, SET, SUB_SIZE, TX_SIZE, Y_MODE } from "../SyntaxStructures/Semantics";
 
 import {
   Adjusted_Tx_Size,
@@ -18,167 +17,25 @@ import {
   Tx_Width,
   Tx_Width_Log2,
 } from "../AdditionalTables/ConversionTables";
-
-const Intra_Mode_Context = [0, 1, 2, 3, 4, 4, 4, 4, 3, 0, 1, 2, 0];
-const Compound_Mode_Ctx_Map = [
-  [0, 1, 1, 1, 1],
-  [1, 2, 3, 4, 4],
-  [4, 4, 5, 6, 7],
-];
-const Coeff_Base_Ctx_Offset = [
-  [
-    [0, 1, 6, 6, 0],
-    [1, 6, 6, 21, 0],
-    [6, 6, 21, 21, 0],
-    [6, 21, 21, 21, 0],
-    [0, 0, 0, 0, 0],
-  ],
-  [
-    [0, 1, 6, 6, 21],
-    [1, 6, 6, 21, 21],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 1, 6, 6, 21],
-    [1, 6, 6, 21, 21],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 1, 6, 6, 21],
-    [1, 6, 6, 21, 21],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 1, 6, 6, 21],
-    [1, 6, 6, 21, 21],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 11, 11, 11, 0],
-    [11, 11, 11, 11, 0],
-    [6, 6, 21, 21, 0],
-    [6, 21, 21, 21, 0],
-    [21, 21, 21, 21, 0],
-  ],
-  [
-    [0, 16, 6, 6, 21],
-    [16, 16, 6, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-    [0, 0, 0, 0, 0],
-  ],
-  [
-    [0, 11, 11, 11, 11],
-    [11, 11, 11, 11, 11],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 16, 6, 6, 21],
-    [16, 16, 6, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-  ],
-  [
-    [0, 11, 11, 11, 11],
-    [11, 11, 11, 11, 11],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 16, 6, 6, 21],
-    [16, 16, 6, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-  ],
-  [
-    [0, 11, 11, 11, 11],
-    [11, 11, 11, 11, 11],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 16, 6, 6, 21],
-    [16, 16, 6, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-  ],
-  [
-    [0, 11, 11, 11, 0],
-    [11, 11, 11, 11, 0],
-    [6, 6, 21, 21, 0],
-    [6, 21, 21, 21, 0],
-    [21, 21, 21, 21, 0],
-  ],
-  [
-    [0, 16, 6, 6, 21],
-    [16, 16, 6, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-    [0, 0, 0, 0, 0],
-  ],
-  [
-    [0, 11, 11, 11, 11],
-    [11, 11, 11, 11, 11],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 16, 6, 6, 21],
-    [16, 16, 6, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-  ],
-  [
-    [0, 11, 11, 11, 11],
-    [11, 11, 11, 11, 11],
-    [6, 6, 21, 21, 21],
-    [6, 21, 21, 21, 21],
-    [21, 21, 21, 21, 21],
-  ],
-  [
-    [0, 16, 6, 6, 21],
-    [16, 16, 6, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-    [16, 16, 21, 21, 21],
-  ],
-];
-const Coeff_Base_Pos_Ctx_Offset = [AV1.SIG_COEF_CONTEXTS_2D, AV1.SIG_COEF_CONTEXTS_2D + 5, AV1.SIG_COEF_CONTEXTS_2D + 10];
-const Mag_Ref_Offset_With_Tx_Class = [
-  [
-    [0, 1],
-    [1, 0],
-    [1, 1],
-  ],
-  [
-    [0, 1],
-    [1, 0],
-    [0, 2],
-  ],
-  [
-    [0, 1],
-    [1, 0],
-    [2, 0],
-  ],
-];
-const Filter_Intra_Mode_To_Intra_Dir = [UV_MODE.DC_PRED, UV_MODE.V_PRED, UV_MODE.H_PRED, UV_MODE.D157_PRED, UV_MODE.DC_PRED];
+import {
+  COEFF_BASE_RANGE,
+  COMP_NEWMV_CTXS,
+  H_ADST,
+  H_DCT,
+  H_FLIPADST,
+  NUM_BASE_LEVELS,
+  SIG_COEF_CONTEXTS,
+  SIG_COEF_CONTEXTS_2D,
+  SIG_COEF_CONTEXTS_EOB,
+  SIG_REF_DIFF_OFFSET_NUM,
+  TX_CLASS_2D,
+  TX_CLASS_HORIZ,
+  TX_CLASS_VERT,
+  TX_SIZES,
+  V_ADST,
+  V_DCT,
+  V_FLIPADST,
+} from "../define";
 
 /**
  * 8.3 Parsing process for CDF encoded syntax elements
@@ -195,13 +52,13 @@ export class CdfEncoded {
     const sd = this.decoder.symbolDecoder;
     return sd.read_symbol(sd.Tile_non_coeff_cdfs.IntrabcCdf);
   }
-  intra_frame_y_mode(data?: any): UV_MODE {
+  intra_frame_y_mode(data?: any): Y_MODE {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const db = tg.decode_block;
     const sd = this.decoder.symbolDecoder;
 
-    let abovemode = Intra_Mode_Context[db.AvailU ? db.YModes[db.MiRow - 1][db.MiCol] : UV_MODE.DC_PRED];
-    let leftmode = Intra_Mode_Context[db.AvailL ? db.YModes[db.MiRow][db.MiCol - 1] : UV_MODE.DC_PRED];
+    let abovemode = Intra_Mode_Context[db.AvailU ? db.YModes[db.MiRow - 1][db.MiCol] : Y_MODE.DC_PRED];
+    let leftmode = Intra_Mode_Context[db.AvailL ? db.YModes[db.MiRow][db.MiCol - 1] : Y_MODE.DC_PRED];
     return sd.read_symbol(sd.TileIntraFrameYModeCdf[abovemode][leftmode]);
   }
   y_mode(data?: any): number {
@@ -212,7 +69,7 @@ export class CdfEncoded {
     let ctx = Size_Group[db.MiSize];
     return sd.read_symbol(sd.Tile_non_coeff_cdfs.YModeCdf[ctx]);
   }
-  uv_mode(data?: any): UV_MODE {
+  uv_mode(data?: any): Y_MODE {
     const tgo = this.decoder.tileGroupObu;
     const tg = tgo.titleGroup;
     const db = tg.decode_block;
@@ -232,14 +89,14 @@ export class CdfEncoded {
     const ifmi = tg.intra_frame_mode_info;
     const sd = this.decoder.symbolDecoder;
 
-    return sd.read_symbol(sd.Tile_non_coeff_cdfs.AngleDeltaCdf[ifmi.YMode - UV_MODE.V_PRED]);
+    return sd.read_symbol(sd.Tile_non_coeff_cdfs.AngleDeltaCdf[ifmi.YMode - Y_MODE.V_PRED]);
   }
   angle_delta_uv(data?: any): number {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const ifmi = tg.intra_frame_mode_info;
     const sd = this.decoder.symbolDecoder;
 
-    return sd.read_symbol(sd.Tile_non_coeff_cdfs.AngleDeltaCdf[ifmi.UVMode - UV_MODE.V_PRED]);
+    return sd.read_symbol(sd.Tile_non_coeff_cdfs.AngleDeltaCdf[ifmi.UVMode - Y_MODE.V_PRED]);
   }
   partition({ bSize, r, c }: { bSize: number; r: number; c: number }): number {
     const tg = this.decoder.tileGroupObu.titleGroup;
@@ -306,7 +163,7 @@ export class CdfEncoded {
 
     /** store the inverse cdf */
     let cdf = [-psum, 0, 0];
-    return sd.read_symbol(cdf);
+    return sd.read_symbol(cdf, { cdf_update: false });
   }
   split_or_vert({ bSize, r, c }: { bSize: number; r: number; c: number }): number {
     const tg = this.decoder.tileGroupObu.titleGroup;
@@ -351,9 +208,9 @@ export class CdfEncoded {
 
     /** store the inverse cdf */
     let cdf = [-psum, 0, 0];
-    return sd.read_symbol(cdf);
+    return sd.read_symbol(cdf, { cdf_update: false });
   }
-  tx_depth({ maxRectTxSize }: { maxRectTxSize: number }): number {
+  tx_depth({ maxRectTxSize, maxTxDepth }: { maxRectTxSize: number; maxTxDepth: number }): number {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const db = tg.decode_block;
     const sd = this.decoder.symbolDecoder;
@@ -374,8 +231,17 @@ export class CdfEncoded {
     } else if (db.AvailL) {
       leftH = this.get_left_tx_height(db.MiRow, db.MiCol);
     }
+
     let ctx = Number(aboveW >= maxTxWidth) + Number(leftH >= maxTxHeight);
-    return sd.read_symbol(sd.Tile_non_coeff_cdfs.TxfmSplitCdf[ctx]);
+    if (maxTxDepth == 4) {
+      return sd.read_symbol(sd.Tile_non_coeff_cdfs.Tx64x64Cdf[ctx]);
+    } else if (maxTxDepth == 3) {
+      return sd.read_symbol(sd.Tile_non_coeff_cdfs.Tx32x32Cdf[ctx]);
+    } else if (maxTxDepth == 2) {
+      return sd.read_symbol(sd.Tile_non_coeff_cdfs.Tx16x16Cdf[ctx]);
+    } else {
+      return sd.read_symbol(sd.Tile_non_coeff_cdfs.Tx8x8Cdf[ctx]);
+    }
   }
   txfm_split({ row, col, txSz }: { row: number; col: number; txSz: number }): number {
     const tgo = this.decoder.tileGroupObu;
@@ -388,7 +254,7 @@ export class CdfEncoded {
     let size = Math.min(64, Math.max(Block_Width[db.MiSize], Block_Height[db.MiSize]));
     let maxTxSz = tgo.find_tx_size(size, size);
     let txSzSqrUp = Tx_Size_Sqr_Up[txSz];
-    let ctx = Number(txSzSqrUp != maxTxSz) * 3 + (AV1.TX_SIZES - 1 - maxTxSz) * 6 + above + left;
+    let ctx = Number(txSzSqrUp != maxTxSz) * 3 + (TX_SIZES - 1 - maxTxSz) * 6 + above + left;
     return sd.read_symbol(sd.Tile_non_coeff_cdfs.TxfmSplitCdf[ctx]);
   }
   segment_id({ prevUL, prevU, prevL }: { prevUL: number; prevU: number; prevL: number }): number {
@@ -580,7 +446,7 @@ export class CdfEncoded {
   compound_mode(data?: any): number {
     const sd = this.decoder.symbolDecoder;
     const mvp = this.decoder.motionVectorPrediction;
-    let ctx = Compound_Mode_Ctx_Map[mvp.RefMvContext >> 1][Math.min(mvp.NewMvContext, AV1.COMP_NEWMV_CTXS - 1)];
+    let ctx = Compound_Mode_Ctx_Map[mvp.RefMvContext >> 1][Math.min(mvp.NewMvContext, COMP_NEWMV_CTXS - 1)];
     return sd.read_symbol(sd.Tile_non_coeff_cdfs.CompoundModeCdf[ctx]);
   }
   interp_filter({ dir }: { dir: number }): number {
@@ -747,31 +613,31 @@ export class CdfEncoded {
   eob_pt_16({ plane, txSz, x4, y4, ptype }: { plane: number; txSz: number; x4: number; y4: number; ptype: number }): number {
     const sd = this.decoder.symbolDecoder;
     let txType = this.decoder.tileGroupObu.compute_tx_type(plane, txSz, x4, y4);
-    let ctx = this.get_tx_class(txType) == AV1.TX_CLASS_2D ? 0 : 1;
+    let ctx = this.get_tx_class(txType) == TX_CLASS_2D ? 0 : 1;
     return sd.read_symbol(sd.Tile_coeff_cdfs.EobPt16Cdf[ptype][ctx]);
   }
   eob_pt_32({ plane, txSz, x4, y4, ptype }: { plane: number; txSz: number; x4: number; y4: number; ptype: number }): number {
     const sd = this.decoder.symbolDecoder;
     let txType = this.decoder.tileGroupObu.compute_tx_type(plane, txSz, x4, y4);
-    let ctx = this.get_tx_class(txType) == AV1.TX_CLASS_2D ? 0 : 1;
+    let ctx = this.get_tx_class(txType) == TX_CLASS_2D ? 0 : 1;
     return sd.read_symbol(sd.Tile_coeff_cdfs.EobPt32Cdf[ptype][ctx]);
   }
   eob_pt_64({ plane, txSz, x4, y4, ptype }: { plane: number; txSz: number; x4: number; y4: number; ptype: number }): number {
     const sd = this.decoder.symbolDecoder;
     let txType = this.decoder.tileGroupObu.compute_tx_type(plane, txSz, x4, y4);
-    let ctx = this.get_tx_class(txType) == AV1.TX_CLASS_2D ? 0 : 1;
+    let ctx = this.get_tx_class(txType) == TX_CLASS_2D ? 0 : 1;
     return sd.read_symbol(sd.Tile_coeff_cdfs.EobPt64Cdf[ptype][ctx]);
   }
   eob_pt_128({ plane, txSz, x4, y4, ptype }: { plane: number; txSz: number; x4: number; y4: number; ptype: number }): number {
     const sd = this.decoder.symbolDecoder;
     let txType = this.decoder.tileGroupObu.compute_tx_type(plane, txSz, x4, y4);
-    let ctx = this.get_tx_class(txType) == AV1.TX_CLASS_2D ? 0 : 1;
+    let ctx = this.get_tx_class(txType) == TX_CLASS_2D ? 0 : 1;
     return sd.read_symbol(sd.Tile_coeff_cdfs.EobPt128Cdf[ptype][ctx]);
   }
   eob_pt_256({ plane, txSz, x4, y4, ptype }: { plane: number; txSz: number; x4: number; y4: number; ptype: number }): number {
     const sd = this.decoder.symbolDecoder;
     let txType = this.decoder.tileGroupObu.compute_tx_type(plane, txSz, x4, y4);
-    let ctx = this.get_tx_class(txType) == AV1.TX_CLASS_2D ? 0 : 1;
+    let ctx = this.get_tx_class(txType) == TX_CLASS_2D ? 0 : 1;
     return sd.read_symbol(sd.Tile_coeff_cdfs.EobPt256Cdf[ptype][ctx]);
   }
   eob_pt_512({ ptype }: { ptype: number }): number {
@@ -829,7 +695,7 @@ export class CdfEncoded {
     ptype: number;
   }): number {
     const sd = this.decoder.symbolDecoder;
-    let ctx = this.get_coeff_base_ctx(txSz, plane, x4, y4, scan[c], c, 1) - AV1.SIG_COEF_CONTEXTS + AV1.SIG_COEF_CONTEXTS_EOB;
+    let ctx = this.get_coeff_base_ctx(txSz, plane, x4, y4, scan[c], c, 1) - SIG_COEF_CONTEXTS + SIG_COEF_CONTEXTS_EOB;
     return sd.read_symbol(sd.Tile_coeff_cdfs.CoeffBaseEobCdf[txSzCtx][ptype][ctx]);
   }
   dc_sign({ plane, w4, h4, x4, y4, ptype }: { plane: number; w4: number; h4: number; x4: number; y4: number; ptype: number }): number {
@@ -899,7 +765,7 @@ export class CdfEncoded {
       let refRow = row + Mag_Ref_Offset_With_Tx_Class[txClass][idx][0];
       let refCol = col + Mag_Ref_Offset_With_Tx_Class[txClass][idx][1];
       if (refRow >= 0 && refCol >= 0 && refRow < txh && refCol < 1 << bwl) {
-        mag += Math.min(coef.Quant[refRow * txw + refCol], AV1.COEFF_BASE_RANGE + AV1.NUM_BASE_LEVELS + 1);
+        mag += Math.min(coef.Quant[refRow * txw + refCol], COEFF_BASE_RANGE + NUM_BASE_LEVELS + 1);
       }
     }
 
@@ -1030,7 +896,7 @@ export class CdfEncoded {
     const fimi = tg.filter_intra_mode_info;
     const sd = this.decoder.symbolDecoder;
 
-    let intraDir = ifmi.YMode as UV_MODE;
+    let intraDir = ifmi.YMode;
     if (fimi.use_filter_intra === 1) {
       intraDir = Filter_Intra_Mode_To_Intra_Dir[fimi.filter_intra_mode];
     }
@@ -1077,20 +943,34 @@ export class CdfEncoded {
       if (!aboveCompInter && !leftCompInter) {
         ctx = 1 + 2 * samedir;
       } else if (!aboveCompInter) {
-        if (!leftUniComp) ctx = 1;
-        else ctx = 3 + samedir;
+        if (!leftUniComp) {
+          ctx = 1;
+        } else {
+          ctx = 3 + samedir;
+        }
       } else if (!leftCompInter) {
-        if (!aboveUniComp) ctx = 1;
-        else ctx = 3 + samedir;
+        if (!aboveUniComp) {
+          ctx = 1;
+        } else {
+          ctx = 3 + samedir;
+        }
       } else {
-        if (!aboveUniComp && !leftUniComp) ctx = 0;
-        else if (!aboveUniComp || !leftUniComp) ctx = 2;
-        else ctx = 3 + Number((above0 == REF_FRAME.BWDREF_FRAME) == (left0 == REF_FRAME.BWDREF_FRAME));
+        if (!aboveUniComp && !leftUniComp) {
+          ctx = 0;
+        } else if (!aboveUniComp || !leftUniComp) {
+          ctx = 2;
+        } else {
+          ctx = 3 + Number((above0 == REF_FRAME.BWDREF_FRAME) == (left0 == REF_FRAME.BWDREF_FRAME));
+        }
       }
     } else if (db.AvailU && db.AvailL) {
-      if (aboveCompInter) ctx = 1 + 2 * aboveUniComp;
-      else if (leftCompInter) ctx = 1 + 2 * leftUniComp;
-      else ctx = 2;
+      if (aboveCompInter) {
+        ctx = 1 + 2 * aboveUniComp;
+      } else if (leftCompInter) {
+        ctx = 1 + 2 * leftUniComp;
+      } else {
+        ctx = 2;
+      }
     } else if (aboveCompInter) {
       ctx = 4 * aboveUniComp;
     } else if (leftCompInter) {
@@ -1348,22 +1228,22 @@ export class CdfEncoded {
     let txType = this.decoder.tileGroupObu.compute_tx_type(plane, txSz, blockX, blockY);
     if (isEob) {
       if (c == 0) {
-        return AV1.SIG_COEF_CONTEXTS - 4;
+        return SIG_COEF_CONTEXTS - 4;
       }
       if (c <= (height << bwl) / 8) {
-        return AV1.SIG_COEF_CONTEXTS - 3;
+        return SIG_COEF_CONTEXTS - 3;
       }
       if (c <= (height << bwl) / 4) {
-        return AV1.SIG_COEF_CONTEXTS - 2;
+        return SIG_COEF_CONTEXTS - 2;
       }
-      return AV1.SIG_COEF_CONTEXTS - 1;
+      return SIG_COEF_CONTEXTS - 1;
     }
     let txClass = this.get_tx_class(txType);
     let row = pos >> bwl;
     let col = pos - (row << bwl);
     let mag = 0;
 
-    for (let idx = 0; idx < AV1.SIG_REF_DIFF_OFFSET_NUM; idx++) {
+    for (let idx = 0; idx < SIG_REF_DIFF_OFFSET_NUM; idx++) {
       let refRow = row + Sig_Ref_Diff_Offset[txClass][idx][0];
       let refCol = col + Sig_Ref_Diff_Offset[txClass][idx][1];
       if (refRow >= 0 && refCol >= 0 && refRow < height && refCol < width) {
@@ -1372,25 +1252,186 @@ export class CdfEncoded {
     }
 
     let ctx = Math.min((mag + 1) >> 1, 4);
-    if (txClass == AV1.TX_CLASS_2D) {
+    if (txClass == TX_CLASS_2D) {
       if (row == 0 && col == 0) {
         return 0;
       }
       return ctx + Coeff_Base_Ctx_Offset[txSz][Math.min(row, 4)][Math.min(col, 4)];
     }
-    let idx = txClass == AV1.TX_CLASS_VERT ? row : col;
+    let idx = txClass == TX_CLASS_VERT ? row : col;
     return ctx + Coeff_Base_Pos_Ctx_Offset[Math.min(idx, 2)];
   }
 
   private get_tx_class(txType: number) {
-    if (txType == AV1.V_DCT || txType == AV1.V_ADST || txType == AV1.V_FLIPADST) {
-      return AV1.TX_CLASS_VERT;
-    } else if (txType == AV1.H_DCT || txType == AV1.H_ADST || txType == AV1.H_FLIPADST) {
-      return AV1.TX_CLASS_HORIZ;
-    } else return AV1.TX_CLASS_2D;
+    if (txType == V_DCT || txType == V_ADST || txType == V_FLIPADST) {
+      return TX_CLASS_VERT;
+    } else if (txType == H_DCT || txType == H_ADST || txType == H_FLIPADST) {
+      return TX_CLASS_HORIZ;
+    } else return TX_CLASS_2D;
   }
 
   private is_samedir_ref_pair(ref0: number, ref1: number) {
     return Number(ref0 >= REF_FRAME.BWDREF_FRAME == ref1 >= REF_FRAME.BWDREF_FRAME);
   }
 }
+
+const Intra_Mode_Context = [0, 1, 2, 3, 4, 4, 4, 4, 3, 0, 1, 2, 0];
+const Compound_Mode_Ctx_Map = [
+  [0, 1, 1, 1, 1],
+  [1, 2, 3, 4, 4],
+  [4, 4, 5, 6, 7],
+];
+const Coeff_Base_Ctx_Offset = [
+  [
+    [0, 1, 6, 6, 0],
+    [1, 6, 6, 21, 0],
+    [6, 6, 21, 21, 0],
+    [6, 21, 21, 21, 0],
+    [0, 0, 0, 0, 0],
+  ],
+  [
+    [0, 1, 6, 6, 21],
+    [1, 6, 6, 21, 21],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 1, 6, 6, 21],
+    [1, 6, 6, 21, 21],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 1, 6, 6, 21],
+    [1, 6, 6, 21, 21],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 1, 6, 6, 21],
+    [1, 6, 6, 21, 21],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 11, 11, 11, 0],
+    [11, 11, 11, 11, 0],
+    [6, 6, 21, 21, 0],
+    [6, 21, 21, 21, 0],
+    [21, 21, 21, 21, 0],
+  ],
+  [
+    [0, 16, 6, 6, 21],
+    [16, 16, 6, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+    [0, 0, 0, 0, 0],
+  ],
+  [
+    [0, 11, 11, 11, 11],
+    [11, 11, 11, 11, 11],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 16, 6, 6, 21],
+    [16, 16, 6, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+  ],
+  [
+    [0, 11, 11, 11, 11],
+    [11, 11, 11, 11, 11],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 16, 6, 6, 21],
+    [16, 16, 6, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+  ],
+  [
+    [0, 11, 11, 11, 11],
+    [11, 11, 11, 11, 11],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 16, 6, 6, 21],
+    [16, 16, 6, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+  ],
+  [
+    [0, 11, 11, 11, 0],
+    [11, 11, 11, 11, 0],
+    [6, 6, 21, 21, 0],
+    [6, 21, 21, 21, 0],
+    [21, 21, 21, 21, 0],
+  ],
+  [
+    [0, 16, 6, 6, 21],
+    [16, 16, 6, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+    [0, 0, 0, 0, 0],
+  ],
+  [
+    [0, 11, 11, 11, 11],
+    [11, 11, 11, 11, 11],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 16, 6, 6, 21],
+    [16, 16, 6, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+  ],
+  [
+    [0, 11, 11, 11, 11],
+    [11, 11, 11, 11, 11],
+    [6, 6, 21, 21, 21],
+    [6, 21, 21, 21, 21],
+    [21, 21, 21, 21, 21],
+  ],
+  [
+    [0, 16, 6, 6, 21],
+    [16, 16, 6, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+    [16, 16, 21, 21, 21],
+  ],
+];
+const Coeff_Base_Pos_Ctx_Offset = [SIG_COEF_CONTEXTS_2D, SIG_COEF_CONTEXTS_2D + 5, SIG_COEF_CONTEXTS_2D + 10];
+const Mag_Ref_Offset_With_Tx_Class = [
+  [
+    [0, 1],
+    [1, 0],
+    [1, 1],
+  ],
+  [
+    [0, 1],
+    [1, 0],
+    [0, 2],
+  ],
+  [
+    [0, 1],
+    [1, 0],
+    [2, 0],
+  ],
+];
+const Filter_Intra_Mode_To_Intra_Dir = [Y_MODE.DC_PRED, Y_MODE.V_PRED, Y_MODE.H_PRED, Y_MODE.D157_PRED, Y_MODE.DC_PRED];

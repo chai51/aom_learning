@@ -1,5 +1,4 @@
 import { Array2D, Clip1, Clip3, integer, Round2 } from "../Conventions";
-import * as AV1 from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { TX_SIZE } from "../SyntaxStructures/Semantics";
@@ -7,6 +6,7 @@ import { TX_SIZE } from "../SyntaxStructures/Semantics";
 import { assert } from "console";
 import { Tx_Height_Log2, Tx_Width_Log2 } from "../AdditionalTables/ConversionTables";
 import { Qm_Offset, Quantizer_Matrix } from "../AdditionalTables/QuantizerMatrixTables";
+import { ADST_FLIPADST, DCT_FLIPADST, FLIPADST_ADST, FLIPADST_DCT, FLIPADST_FLIPADST, H_FLIPADST, IDTX, SEG_LVL_ALT_Q, V_FLIPADST } from "../define";
 
 /**
  * 7.12 Reconstruction and dequantization
@@ -116,9 +116,9 @@ export class ReconstructionAndDequantization {
     const tgo = this.decoder.tileGroupObu;
     const tg = tgo.titleGroup;
 
-    if (tgo.seg_feature_active_idx(segmentId, AV1.SEG_LVL_ALT_Q) == 1) {
+    if (tgo.seg_feature_active_idx(segmentId, SEG_LVL_ALT_Q) == 1) {
       // 1.
-      let data = sp.FeatureData[segmentId][AV1.SEG_LVL_ALT_Q];
+      let data = sp.FeatureData[segmentId][SEG_LVL_ALT_Q];
 
       // 2.
       let qindex = qp.base_q_idx + data;
@@ -198,11 +198,11 @@ export class ReconstructionAndDequantization {
     let th = Math.min(32, h);
 
     let flipUD = 0;
-    if (coef.PlaneTxType == AV1.FLIPADST_DCT || coef.PlaneTxType == AV1.FLIPADST_ADST || coef.PlaneTxType == AV1.V_FLIPADST || coef.PlaneTxType == AV1.FLIPADST_FLIPADST) {
+    if (coef.PlaneTxType == FLIPADST_DCT || coef.PlaneTxType == FLIPADST_ADST || coef.PlaneTxType == V_FLIPADST || coef.PlaneTxType == FLIPADST_FLIPADST) {
       flipUD = 1;
     }
     let flipLR = 0;
-    if (coef.PlaneTxType == AV1.DCT_FLIPADST || coef.PlaneTxType == AV1.ADST_FLIPADST || coef.PlaneTxType == AV1.H_FLIPADST || coef.PlaneTxType == AV1.FLIPADST_FLIPADST) {
+    if (coef.PlaneTxType == DCT_FLIPADST || coef.PlaneTxType == ADST_FLIPADST || coef.PlaneTxType == H_FLIPADST || coef.PlaneTxType == FLIPADST_FLIPADST) {
       flipLR = 1;
     }
 
@@ -219,7 +219,7 @@ export class ReconstructionAndDequantization {
 
         // b.
         let q2: number; // level
-        if (qp.using_qmatrix == 1 && coef.PlaneTxType < AV1.IDTX && fh.SegQMLevel[plane][si.segment_id] < 15) {
+        if (qp.using_qmatrix == 1 && coef.PlaneTxType < IDTX && fh.SegQMLevel[plane][si.segment_id] < 15) {
           q2 = Round2(q * Quantizer_Matrix[fh.SegQMLevel[plane][si.segment_id]][Number(plane > 0)][Qm_Offset[txSz] + i * tw + j], 5);
         } else {
           q2 = q;

@@ -1,5 +1,5 @@
 import { assert } from "console";
-import * as AV1 from "../define";
+import { SELECT_INTEGER_MV, SELECT_SCREEN_CONTENT_TOOLS, UINT32_MAX } from "../define";
 import { AV1Decoder } from "./Obu";
 import { CHROMA_SAMPLE_POSITION, COLOR_PRIMARIES, MATRIX_COEFFICIENTS, TRANSFER_CHARACTERISTICS } from "./Semantics";
 
@@ -133,8 +133,8 @@ export class SequenceHeaderObu {
       seqHeader.enable_order_hint = 0;
       seqHeader.enable_jnt_comp = 0;
       seqHeader.enable_ref_frame_mvs = 0;
-      seqHeader.seq_force_screen_content_tools = AV1.SELECT_SCREEN_CONTENT_TOOLS;
-      seqHeader.seq_force_integer_mv = AV1.SELECT_INTEGER_MV;
+      seqHeader.seq_force_screen_content_tools = SELECT_SCREEN_CONTENT_TOOLS;
+      seqHeader.seq_force_integer_mv = SELECT_INTEGER_MV;
       seqHeader.OrderHintBits = 0;
     } else {
       seqHeader.enable_interintra_compound = reader.f(1);
@@ -151,19 +151,19 @@ export class SequenceHeaderObu {
       }
       let seq_choose_screen_content_tools = reader.f(1);
       if (seq_choose_screen_content_tools) {
-        seqHeader.seq_force_screen_content_tools = AV1.SELECT_SCREEN_CONTENT_TOOLS;
+        seqHeader.seq_force_screen_content_tools = SELECT_SCREEN_CONTENT_TOOLS;
       } else {
         seqHeader.seq_force_screen_content_tools = reader.f(1);
       }
       if (seqHeader.seq_force_screen_content_tools > 0) {
         let seq_choose_integer_mv = reader.f(1);
         if (seq_choose_integer_mv) {
-          seqHeader.seq_force_integer_mv = AV1.SELECT_INTEGER_MV;
+          seqHeader.seq_force_integer_mv = SELECT_INTEGER_MV;
         } else {
           seqHeader.seq_force_integer_mv = reader.f(1);
         }
       } else {
-        seqHeader.seq_force_integer_mv = AV1.SELECT_INTEGER_MV;
+        seqHeader.seq_force_integer_mv = SELECT_INTEGER_MV;
       }
       if (seqHeader.enable_order_hint) {
         let order_hint_bits_minus_1 = reader.f(3);
@@ -307,7 +307,7 @@ export class SequenceHeaderObu {
     if (ti.equal_picture_interval) {
       ti.num_ticks_per_picture_minus_1 = reader.uvlc();
       assert(
-        ti.num_ticks_per_picture_minus_1 >= 0 && ti.num_ticks_per_picture_minus_1 < AV1.UINT32_MAX,
+        ti.num_ticks_per_picture_minus_1 >= 0 && ti.num_ticks_per_picture_minus_1 < UINT32_MAX,
         "It is a requirement of bitstream conformance that the value of num_ticks_per_picture_minus_1 shall be in the range of 0 to (1 << 32) - 2, inclusive."
       );
     }

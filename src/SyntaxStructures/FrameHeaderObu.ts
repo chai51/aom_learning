@@ -1,5 +1,4 @@
 import { Array2D, Array3D, Clip3, clone, clone_cdf, integer, inverseCdf } from "../Conventions";
-import * as AV1 from "../define";
 import { AV1Decoder } from "./Obu";
 
 import { CoeffCdfs, FRAME_RESTORATION_TYPE, FRAME_TYPE, INTERPOLATION_FILTER, NonCoeffCdfs, OBU_HEADER_TYPE, REF_FRAME, TX_MODE } from "./Semantics";
@@ -102,10 +101,7 @@ import {
   Default_Y_Mode_Cdf,
   Default_Zero_Mv_Cdf,
 } from "../AdditionalTables/DefaultCdfTables";
-
-const Segmentation_Feature_Bits = [8, 6, 6, 6, 6, 3, 0, 0];
-const Segmentation_Feature_Signed = [1, 1, 1, 1, 1, 0, 0, 0];
-const Segmentation_Feature_Max = [255, AV1.MAX_LOOP_FILTER, AV1.MAX_LOOP_FILTER, AV1.MAX_LOOP_FILTER, AV1.MAX_LOOP_FILTER, 7, 0, 0];
+import { AFFINE, FRAME_LF_COUNT, GM_ABS_ALPHA_BITS, GM_ABS_TRANS_BITS, GM_ABS_TRANS_ONLY_BITS, GM_ALPHA_PREC_BITS, GM_TRANS_ONLY_PREC_BITS, GM_TRANS_PREC_BITS, IDENTITY, MAX_LOOP_FILTER, MAX_SEGMENTS, MAX_TILE_AREA, MAX_TILE_COLS, MAX_TILE_ROWS, MAX_TILE_WIDTH, MV_CONTEXTS, NUM_REF_FRAMES, PRIMARY_REF_NONE, REFS_PER_FRAME, RESTORATION_TILESIZE_MAX, ROTZOOM, SEG_LVL_MAX, SEG_LVL_REF_FRAME, SELECT_INTEGER_MV, SELECT_SCREEN_CONTENT_TOOLS, SUPERRES_DENOM_BITS, SUPERRES_DENOM_MIN, SUPERRES_NUM, TOTAL_REFS_PER_FRAME, TRANSLATION, WARPEDMODEL_PREC_BITS } from "../define";
 
 /**
  * 5.9 Frame header OBU syntax
@@ -152,8 +148,8 @@ export class FrameHeaderObu {
       },
       quantization_params: {},
       segmentation_params: {
-        FeatureEnabled: Array2D(AV1.MAX_SEGMENTS),
-        FeatureData: Array2D(AV1.MAX_SEGMENTS),
+        FeatureEnabled: Array2D(MAX_SEGMENTS),
+        FeatureData: Array2D(MAX_SEGMENTS),
       },
       tile_info: {
         MiColStarts: [],
@@ -178,31 +174,31 @@ export class FrameHeaderObu {
       },
       frame_reference_mode: {},
       global_motion_params: {
-        gm_params: Array2D(AV1.NUM_REF_FRAMES),
+        gm_params: Array2D(NUM_REF_FRAMES),
         GmType: [],
       },
       temporal_point_info: {},
       past_independence: {
-        PrevGmParams: Array2D(AV1.NUM_REF_FRAMES),
+        PrevGmParams: Array2D(NUM_REF_FRAMES),
       },
       non_coeff_cdfs: {
         MvJointCdf: [],
         MvClassCdf: [],
-        MvClass0BitCdf: Array2D(AV1.MV_CONTEXTS),
+        MvClass0BitCdf: Array2D(MV_CONTEXTS),
         MvFrCdf: [],
         MvClass0FrCdf: [],
-        MvClass0HpCdf: Array2D(AV1.MV_CONTEXTS),
-        MvSignCdf: Array2D(AV1.MV_CONTEXTS),
-        MvBitCdf: Array2D(AV1.MV_CONTEXTS),
-        MvHpCdf: Array2D(AV1.MV_CONTEXTS),
+        MvClass0HpCdf: Array2D(MV_CONTEXTS),
+        MvSignCdf: Array2D(MV_CONTEXTS),
+        MvBitCdf: Array2D(MV_CONTEXTS),
+        MvHpCdf: Array2D(MV_CONTEXTS),
         DeltaLFMultiCdf: [],
       },
       coeff_cdfs: {},
       previous_segment_ids: {
-        PrevGmParams: Array2D(AV1.NUM_REF_FRAMES),
+        PrevGmParams: Array2D(NUM_REF_FRAMES),
         RefMiCols: [],
         RefMiRows: [],
-        SavedGmParams: Array3D(AV1.NUM_REF_FRAMES, AV1.NUM_REF_FRAMES),
+        SavedGmParams: Array3D(NUM_REF_FRAMES, NUM_REF_FRAMES),
       },
       ref_frames: {
         RefFrameType: [],
@@ -279,7 +275,7 @@ export class FrameHeaderObu {
     if (seqHeader.frame_id_numbers_present_flag) {
       idLen = seqHeader.additional_frame_id_length_minus_1 + seqHeader.delta_frame_id_length_minus_2 + 3;
     }
-    let allFrames = (1 << AV1.NUM_REF_FRAMES) - 1;
+    let allFrames = (1 << NUM_REF_FRAMES) - 1;
     if (seqHeader.reduced_still_picture_header) {
       fh.show_existing_frame = 0;
       fh.frame_type = FRAME_TYPE.KEY_FRAME;
@@ -343,23 +339,23 @@ export class FrameHeaderObu {
       }
     }
     if (fh.frame_type == FRAME_TYPE.KEY_FRAME && fh.show_frame) {
-      for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+      for (let i = 0; i < NUM_REF_FRAMES; i++) {
         rfm.RefValid[i] = 0;
         fh.RefOrderHint[i] = 0;
       }
-      for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+      for (let i = 0; i < REFS_PER_FRAME; i++) {
         fh.OrderHints[REF_FRAME.LAST_FRAME + i] = 0;
       }
     }
 
     fh.disable_cdf_update = reader.f(1);
-    if (seqHeader.seq_force_screen_content_tools == AV1.SELECT_SCREEN_CONTENT_TOOLS) {
+    if (seqHeader.seq_force_screen_content_tools == SELECT_SCREEN_CONTENT_TOOLS) {
       fh.allow_screen_content_tools = reader.f(1);
     } else {
       fh.allow_screen_content_tools = seqHeader.seq_force_screen_content_tools;
     }
     if (fh.allow_screen_content_tools) {
-      if (seqHeader.seq_force_integer_mv == AV1.SELECT_INTEGER_MV) {
+      if (seqHeader.seq_force_integer_mv == SELECT_INTEGER_MV) {
         fh.force_integer_mv = reader.f(1);
       } else {
         fh.force_integer_mv = seqHeader.seq_force_integer_mv;
@@ -397,7 +393,7 @@ export class FrameHeaderObu {
     let order_hint = reader.f(seqHeader.OrderHintBits);
     fh.OrderHint = order_hint;
     if (fh.FrameIsIntra || fh.error_resilient_mode) {
-      fh.primary_ref_frame = AV1.PRIMARY_REF_NONE;
+      fh.primary_ref_frame = PRIMARY_REF_NONE;
     } else {
       fh.primary_ref_frame = reader.f(3);
     }
@@ -433,7 +429,7 @@ export class FrameHeaderObu {
     }
     if (!fh.FrameIsIntra || fh.refresh_frame_flags != allFrames) {
       if (fh.error_resilient_mode && seqHeader.enable_order_hint) {
-        for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+        for (let i = 0; i < NUM_REF_FRAMES; i++) {
           fh.ref_order_hint[i] = reader.f(seqHeader.OrderHintBits);
           if (fh.ref_order_hint[i] != fh.RefOrderHint[i]) {
             rfm.RefValid[i] = 0;
@@ -460,7 +456,7 @@ export class FrameHeaderObu {
         }
       }
       let expectedFrameId: number[] = [];
-      for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+      for (let i = 0; i < REFS_PER_FRAME; i++) {
         if (!fh.frame_refs_short_signaling) {
           fh.ref_frame_idx[i] = reader.f(3);
           assert(rfm.RefValid[fh.ref_frame_idx[i]] == 1, "It is a requirement of bitstream conformance that RefValid[ ref_frame_idx[ i ] ] is equal to 1");
@@ -496,7 +492,7 @@ export class FrameHeaderObu {
       } else {
         fh.use_ref_frame_mvs = reader.f(1);
       }
-      for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+      for (let i = 0; i < REFS_PER_FRAME; i++) {
         let refFrame = REF_FRAME.LAST_FRAME + i;
         let hint = fh.RefOrderHint[fh.ref_frame_idx[i]];
         fh.OrderHints[refFrame] = hint;
@@ -514,7 +510,7 @@ export class FrameHeaderObu {
       fh.disable_frame_end_update_cdf = reader.f(1);
     }
 
-    if (fh.primary_ref_frame == AV1.PRIMARY_REF_NONE) {
+    if (fh.primary_ref_frame == PRIMARY_REF_NONE) {
       this.init_non_coeff_cdfs();
       this.setup_past_independence();
     } else {
@@ -530,13 +526,13 @@ export class FrameHeaderObu {
     this.segmentation_params();
     this.delta_q_params();
     this.delta_lf_params();
-    if (fh.primary_ref_frame == AV1.PRIMARY_REF_NONE) {
+    if (fh.primary_ref_frame == PRIMARY_REF_NONE) {
       this.init_coeff_cdfs();
     } else {
       this.load_previous_segment_ids();
     }
     fh.CodedLossless = 1;
-    for (let segmentId = 0; segmentId < AV1.MAX_SEGMENTS; segmentId++) {
+    for (let segmentId = 0; segmentId < MAX_SEGMENTS; segmentId++) {
       let qindex = rad.get_qindex(1, segmentId);
       fh.LosslessArray[segmentId] = Number(qindex == 0 && qp.DeltaQYDc == 0 && qp.DeltaQUAc == 0 && qp.DeltaQUDc == 0 && qp.DeltaQVAc == 0 && qp.DeltaQVDc == 0);
       if (!fh.LosslessArray[segmentId]) {
@@ -600,7 +596,7 @@ export class FrameHeaderObu {
     const rfm = this.frameHeader.reference_frame_marking;
 
     let diffLen = seqHeader.delta_frame_id_length_minus_2 + 2;
-    for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+    for (let i = 0; i < NUM_REF_FRAMES; i++) {
       if (fh.current_frame_id > 1 << diffLen) {
         if (fh.RefFrameId[i] > fh.current_frame_id || fh.RefFrameId[i] < fh.current_frame_id - (1 << diffLen)) {
           rfm.RefValid[i] = 0;
@@ -693,7 +689,7 @@ export class FrameHeaderObu {
     const mfe = this.decoder.motionFieldEstimation;
     const rad = this.decoder.reconstructionAndDequantization;
 
-    for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+    for (let i = 0; i < REFS_PER_FRAME; i++) {
       fswr.found_ref = reader.f(1);
       if (fswr.found_ref == 1) {
         let ref_frame_idx = fh.ref_frame_idx[i];
@@ -712,7 +708,7 @@ export class FrameHeaderObu {
       this.superres_params();
       this.compute_image_size();
     }
-    for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+    for (let i = 0; i < REFS_PER_FRAME; i++) {
       let ref_frame_idx = fh.ref_frame_idx[i];
       assert(2 * fs.FrameWidth >= rf.RefUpscaledWidth[ref_frame_idx], "2 * FrameWidth >= RefUpscaledWidth[ ref_frame_idx[ i ] ]");
       assert(2 * fs.FrameHeight >= rf.RefFrameHeight[ref_frame_idx], "2 * FrameHeight >= RefFrameHeight[ ref_frame_idx[ i ] ]");
@@ -736,13 +732,13 @@ export class FrameHeaderObu {
     if (seqHeader.enable_superres) sp.use_superres = reader.f(1);
     else sp.use_superres = 0;
     if (sp.use_superres) {
-      let coded_denom = reader.f(AV1.SUPERRES_DENOM_BITS);
-      sp.SuperresDenom = coded_denom + AV1.SUPERRES_DENOM_MIN;
+      let coded_denom = reader.f(SUPERRES_DENOM_BITS);
+      sp.SuperresDenom = coded_denom + SUPERRES_DENOM_MIN;
     } else {
-      sp.SuperresDenom = AV1.SUPERRES_NUM;
+      sp.SuperresDenom = SUPERRES_NUM;
     }
     fswr.UpscaledWidth = fs.FrameWidth;
-    fs.FrameWidth = integer((fswr.UpscaledWidth * AV1.SUPERRES_NUM + integer(sp.SuperresDenom / 2)) / sp.SuperresDenom);
+    fs.FrameWidth = integer((fswr.UpscaledWidth * SUPERRES_NUM + integer(sp.SuperresDenom / 2)) / sp.SuperresDenom);
   }
 
   /**
@@ -818,7 +814,7 @@ export class FrameHeaderObu {
     if (lfp.loop_filter_delta_enabled) {
       let loop_filter_delta_update = reader.f(1);
       if (loop_filter_delta_update) {
-        for (let i = 0; i < AV1.TOTAL_REFS_PER_FRAME; i++) {
+        for (let i = 0; i < TOTAL_REFS_PER_FRAME; i++) {
           let update_ref_delta = reader.f(1);
           if (update_ref_delta == 1) {
             lfp.loop_filter_ref_deltas[i] = reader.su(1 + 6);
@@ -907,7 +903,7 @@ export class FrameHeaderObu {
     sp.segmentation_enabled = reader.f(1);
     if (sp.segmentation_enabled == 1) {
       let segmentation_update_data = 1;
-      if (fh.primary_ref_frame == AV1.PRIMARY_REF_NONE) {
+      if (fh.primary_ref_frame == PRIMARY_REF_NONE) {
         sp.segmentation_update_map = 1;
         sp.segmentation_temporal_update = 0;
       } else {
@@ -916,8 +912,8 @@ export class FrameHeaderObu {
         segmentation_update_data = reader.f(1);
       }
       if (segmentation_update_data == 1) {
-        for (let i = 0; i < AV1.MAX_SEGMENTS; i++) {
-          for (let j = 0; j < AV1.SEG_LVL_MAX; j++) {
+        for (let i = 0; i < MAX_SEGMENTS; i++) {
+          for (let j = 0; j < SEG_LVL_MAX; j++) {
             let feature_value = 0;
             let feature_enabled = reader.f(1);
             sp.FeatureEnabled[i][j] = feature_enabled;
@@ -938,8 +934,8 @@ export class FrameHeaderObu {
         }
       }
     } else {
-      for (let i = 0; i < AV1.MAX_SEGMENTS; i++) {
-        for (let j = 0; j < AV1.SEG_LVL_MAX; j++) {
+      for (let i = 0; i < MAX_SEGMENTS; i++) {
+        for (let j = 0; j < SEG_LVL_MAX; j++) {
           sp.FeatureEnabled[i][j] = 0;
           sp.FeatureData[i][j] = 0;
         }
@@ -947,11 +943,11 @@ export class FrameHeaderObu {
     }
     sp.SegIdPreSkip = 0;
     sp.LastActiveSegId = 0;
-    for (let i = 0; i < AV1.MAX_SEGMENTS; i++) {
-      for (let j = 0; j < AV1.SEG_LVL_MAX; j++) {
+    for (let i = 0; i < MAX_SEGMENTS; i++) {
+      for (let j = 0; j < SEG_LVL_MAX; j++) {
         if (sp.FeatureEnabled[i][j]) {
           sp.LastActiveSegId = i;
-          if (j >= AV1.SEG_LVL_REF_FRAME) {
+          if (j >= SEG_LVL_REF_FRAME) {
             sp.SegIdPreSkip = 1;
           }
         }
@@ -975,11 +971,11 @@ export class FrameHeaderObu {
     let sbRows = seqHeader.use_128x128_superblock ? (cis.MiRows + 31) >> 5 : (cis.MiRows + 15) >> 4;
     let sbShift = seqHeader.use_128x128_superblock ? 5 : 4;
     let sbSize = sbShift + 2;
-    let maxTileWidthSb = AV1.MAX_TILE_WIDTH >> sbSize;
-    let maxTileAreaSb = AV1.MAX_TILE_AREA >> (2 * sbSize);
+    let maxTileWidthSb = MAX_TILE_WIDTH >> sbSize;
+    let maxTileAreaSb = MAX_TILE_AREA >> (2 * sbSize);
     let minLog2TileCols = this.tile_log2(maxTileWidthSb, sbCols);
-    let maxLog2TileCols = this.tile_log2(1, Math.min(sbCols, AV1.MAX_TILE_COLS));
-    let maxLog2TileRows = this.tile_log2(1, Math.min(sbRows, AV1.MAX_TILE_ROWS));
+    let maxLog2TileCols = this.tile_log2(1, Math.min(sbCols, MAX_TILE_COLS));
+    let maxLog2TileRows = this.tile_log2(1, Math.min(sbRows, MAX_TILE_ROWS));
     let minLog2Tiles = Math.max(minLog2TileCols, this.tile_log2(maxTileAreaSb, sbRows * sbCols));
 
     let uniform_tile_spacing_flag = reader.f(1);
@@ -1059,8 +1055,8 @@ export class FrameHeaderObu {
       ti.TileRows = i;
       ti.TileRowsLog2 = this.tile_log2(1, ti.TileRows);
     }
-    assert(ti.TileCols <= AV1.MAX_TILE_COLS, "It is a requirement of bitstream conformance that TileCols is less than or equal to MAX_TILE_COLS.");
-    assert(ti.TileRows <= AV1.MAX_TILE_ROWS, "It is a requirement of bitstream conformance that TileRows is less than or equal to MAX_TILE_ROWS.");
+    assert(ti.TileCols <= MAX_TILE_COLS, "It is a requirement of bitstream conformance that TileCols is less than or equal to MAX_TILE_COLS.");
+    assert(ti.TileRows <= MAX_TILE_ROWS, "It is a requirement of bitstream conformance that TileRows is less than or equal to MAX_TILE_ROWS.");
     if (ti.TileColsLog2 > 0 || ti.TileRowsLog2 > 0) {
       ti.context_update_tile_id = reader.f(ti.TileRowsLog2 + ti.TileColsLog2);
       assert(ti.context_update_tile_id < ti.TileCols * ti.TileRows, "It is a requirement of bitstream conformance that context_update_tile_id is less than TileCols * TileRows");
@@ -1225,7 +1221,7 @@ export class FrameHeaderObu {
           lr_unit_shift += lr_unit_extra_shift;
         }
       }
-      lp.LoopRestorationSize[0] = AV1.RESTORATION_TILESIZE_MAX >> (2 - lr_unit_shift);
+      lp.LoopRestorationSize[0] = RESTORATION_TILESIZE_MAX >> (2 - lr_unit_shift);
       let lr_uv_shift = 0;
       if (cc.subsampling_x && cc.subsampling_y && usesChromaLr) {
         lr_uv_shift = reader.f(1);
@@ -1277,7 +1273,7 @@ export class FrameHeaderObu {
       let backwardIdx = -1;
       let forwardHint = -1;
       let backwardHint = 0;
-      for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+      for (let i = 0; i < REFS_PER_FRAME; i++) {
         let refHint = fh.RefOrderHint[fh.ref_frame_idx[i]];
         if (this.get_relative_dist(refHint, fh.OrderHint) < 0) {
           if (forwardIdx < 0 || this.get_relative_dist(refHint, forwardHint) > 0) {
@@ -1300,7 +1296,7 @@ export class FrameHeaderObu {
       } else {
         let secondForwardIdx = -1;
         let secondForwardHint = -1;
-        for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+        for (let i = 0; i < REFS_PER_FRAME; i++) {
           let refHint = fh.RefOrderHint[fh.ref_frame_idx[i]];
           if (this.get_relative_dist(refHint, forwardHint) < 0) {
             if (secondForwardIdx < 0 || this.get_relative_dist(refHint, secondForwardHint) > 0) {
@@ -1353,9 +1349,9 @@ export class FrameHeaderObu {
     const gmp = this.frameHeader.global_motion_params;
 
     for (let ref = REF_FRAME.LAST_FRAME; ref <= REF_FRAME.ALTREF_FRAME; ref++) {
-      gmp.GmType[ref] = AV1.IDENTITY;
+      gmp.GmType[ref] = IDENTITY;
       for (let i = 0; i < 6; i++) {
-        gmp.gm_params[ref][i] = i % 3 == 2 ? 1 << AV1.WARPEDMODEL_PREC_BITS : 0;
+        gmp.gm_params[ref][i] = i % 3 == 2 ? 1 << WARPEDMODEL_PREC_BITS : 0;
       }
     }
     if (fh.FrameIsIntra) {
@@ -1363,21 +1359,21 @@ export class FrameHeaderObu {
     }
     for (let ref = REF_FRAME.LAST_FRAME; ref <= REF_FRAME.ALTREF_FRAME; ref++) {
       let is_global = reader.f(1);
-      let type = AV1.IDENTITY;
+      let type = IDENTITY;
       if (is_global) {
         let is_rot_zoom = reader.f(1);
         if (is_rot_zoom) {
-          type = AV1.ROTZOOM;
+          type = ROTZOOM;
         } else {
           let is_translation = reader.f(1);
-          type = is_translation ? AV1.TRANSLATION : AV1.AFFINE;
+          type = is_translation ? TRANSLATION : AFFINE;
         }
       }
       gmp.GmType[ref] = type;
-      if (type >= AV1.ROTZOOM) {
+      if (type >= ROTZOOM) {
         this.read_global_param(type, ref, 2);
         this.read_global_param(type, ref, 3);
-        if (type == AV1.AFFINE) {
+        if (type == AFFINE) {
           this.read_global_param(type, ref, 4);
           this.read_global_param(type, ref, 5);
         } else {
@@ -1385,7 +1381,7 @@ export class FrameHeaderObu {
           gmp.gm_params[ref][5] = gmp.gm_params[ref][2];
         }
       }
-      if (type >= AV1.TRANSLATION) {
+      if (type >= TRANSLATION) {
         this.read_global_param(type, ref, 0);
         this.read_global_param(type, ref, 1);
       }
@@ -1402,19 +1398,19 @@ export class FrameHeaderObu {
     const gmp = this.frameHeader.global_motion_params;
     const psi = this.frameHeader.previous_segment_ids;
 
-    let absBits = AV1.GM_ABS_ALPHA_BITS;
-    let precBits = AV1.GM_ALPHA_PREC_BITS;
+    let absBits = GM_ABS_ALPHA_BITS;
+    let precBits = GM_ALPHA_PREC_BITS;
     if (idx < 2) {
-      if (type == AV1.TRANSLATION) {
-        absBits = AV1.GM_ABS_TRANS_ONLY_BITS - Number(!fh.allow_high_precision_mv);
-        precBits = AV1.GM_TRANS_ONLY_PREC_BITS - Number(!fh.allow_high_precision_mv);
+      if (type == TRANSLATION) {
+        absBits = GM_ABS_TRANS_ONLY_BITS - Number(!fh.allow_high_precision_mv);
+        precBits = GM_TRANS_ONLY_PREC_BITS - Number(!fh.allow_high_precision_mv);
       } else {
-        absBits = AV1.GM_ABS_TRANS_BITS;
-        precBits = AV1.GM_TRANS_PREC_BITS;
+        absBits = GM_ABS_TRANS_BITS;
+        precBits = GM_TRANS_PREC_BITS;
       }
     }
-    let precDiff = AV1.WARPEDMODEL_PREC_BITS - precBits;
-    let round = idx % 3 == 2 ? 1 << AV1.WARPEDMODEL_PREC_BITS : 0;
+    let precDiff = WARPEDMODEL_PREC_BITS - precBits;
+    let round = idx % 3 == 2 ? 1 << WARPEDMODEL_PREC_BITS : 0;
     let sub = idx % 3 == 2 ? 1 << precBits : 0;
     let mx = 1 << absBits;
     let r = (psi.PrevGmParams[ref][idx] >> precDiff) - sub;
@@ -1644,8 +1640,8 @@ export class FrameHeaderObu {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const db = tg.decode_block;
 
-    for (let i = 0; i < AV1.MAX_SEGMENTS; i++) {
-      for (let j = 0; j < AV1.SEG_LVL_MAX; j++) {
+    for (let i = 0; i < MAX_SEGMENTS; i++) {
+      for (let j = 0; j < SEG_LVL_MAX; j++) {
         sp.FeatureData[i][j] = 0;
         sp.FeatureEnabled[i][j] = 0;
       }
@@ -1653,7 +1649,7 @@ export class FrameHeaderObu {
     db.PrevSegmentIds = Array2D(cis.MiRows, cis.MiCols, 0);
     for (let ref = REF_FRAME.LAST_FRAME; ref <= REF_FRAME.ALTREF_FRAME; ref++) {
       for (let i = 0; i <= 5; i++) {
-        psi.PrevGmParams[ref][i] = i % 3 == 2 ? 1 << AV1.WARPEDMODEL_PREC_BITS : 0;
+        psi.PrevGmParams[ref][i] = i % 3 == 2 ? 1 << WARPEDMODEL_PREC_BITS : 0;
       }
     }
     lfp.loop_filter_delta_enabled = 1;
@@ -1712,39 +1708,39 @@ export class FrameHeaderObu {
     ncc.CompBwdRefCdf = inverseCdf(Default_Comp_Bwd_Ref_Cdf);
     ncc.SingleRefCdf = inverseCdf(Default_Single_Ref_Cdf);
 
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       ncc.MvJointCdf[i] = inverseCdf(Default_Mv_Joint_Cdf);
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       ncc.MvClassCdf[i] = inverseCdf(Default_Mv_Class_Cdf);
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       for (let comp = 0; comp <= 1; comp++) {
         ncc.MvClass0BitCdf[i][comp] = inverseCdf(Default_Mv_Class0_Bit_Cdf);
       }
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       ncc.MvFrCdf[i] = inverseCdf(Default_Mv_Fr_Cdf);
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       ncc.MvClass0FrCdf[i] = inverseCdf(Default_Mv_Class0_Fr_Cdf);
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       for (let comp = 0; comp <= 1; comp++) {
         ncc.MvClass0HpCdf[i][comp] = inverseCdf(Default_Mv_Class0_Hp_Cdf);
       }
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       for (let comp = 0; comp <= 1; comp++) {
         ncc.MvSignCdf[i][comp] = inverseCdf(Default_Mv_Sign_Cdf);
       }
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       for (let comp = 0; comp <= 1; comp++) {
         ncc.MvBitCdf[i][comp] = inverseCdf(Default_Mv_Bit_Cdf);
       }
     }
-    for (let i = 0; i < AV1.MV_CONTEXTS; i++) {
+    for (let i = 0; i < MV_CONTEXTS; i++) {
       for (let comp = 0; comp <= 1; comp++) {
         ncc.MvHpCdf[i][comp] = inverseCdf(Default_Mv_Hp_Cdf);
       }
@@ -1769,7 +1765,7 @@ export class FrameHeaderObu {
     ncc.PaletteSize8UVColorCdf = inverseCdf(Default_Palette_Size_8_Uv_Color_Cdf);
     ncc.DeltaQCdf = inverseCdf(Default_Delta_Q_Cdf);
     ncc.DeltaLFCdf = inverseCdf(Default_Delta_Lf_Cdf);
-    for (let i = 0; i < AV1.FRAME_LF_COUNT; i++) {
+    for (let i = 0; i < FRAME_LF_COUNT; i++) {
       ncc.DeltaLFMultiCdf[i] = inverseCdf(Default_Delta_Lf_Cdf);
     }
     ncc.IntraTxTypeSet1Cdf = inverseCdf(Default_Intra_Tx_Type_Set1_Cdf);
@@ -1988,7 +1984,7 @@ export class FrameHeaderObu {
     let lfp = this.frameHeader.loop_filter_params;
 
     let loop_filter_ref_deltas: number[] = [];
-    for (let j = 0; j < AV1.TOTAL_REFS_PER_FRAME; j++) {
+    for (let j = 0; j < TOTAL_REFS_PER_FRAME; j++) {
       loop_filter_ref_deltas[j] = lfp.loop_filter_ref_deltas[j];
     }
     let loop_filter_mode_deltas: number[] = [];
@@ -2008,10 +2004,10 @@ export class FrameHeaderObu {
   save_segmentation_params(i: number) {
     const sp = this.frameHeader.segmentation_params;
 
-    let FeatureEnabled = Array2D(AV1.MAX_SEGMENTS);
-    let FeatureData = Array2D(AV1.MAX_SEGMENTS);
-    for (let j = 0; j < AV1.MAX_SEGMENTS; j++) {
-      for (let k = 0; k < AV1.SEG_LVL_MAX; k++) {
+    let FeatureEnabled = Array2D(MAX_SEGMENTS);
+    let FeatureData = Array2D(MAX_SEGMENTS);
+    for (let j = 0; j < MAX_SEGMENTS; j++) {
+      for (let k = 0; k < SEG_LVL_MAX; k++) {
         FeatureEnabled[j][k] = sp.FeatureEnabled[j][k];
         FeatureData[j][k] = sp.FeatureData[j][k];
       }
@@ -2388,3 +2384,8 @@ export class FrameObu {
     this.decoder.tileGroupObu.tile_group_obu(sz);
   }
 }
+
+
+const Segmentation_Feature_Bits = [8, 6, 6, 6, 6, 3, 0, 0];
+const Segmentation_Feature_Signed = [1, 1, 1, 1, 1, 0, 0, 0];
+const Segmentation_Feature_Max = [255, MAX_LOOP_FILTER, MAX_LOOP_FILTER, MAX_LOOP_FILTER, MAX_LOOP_FILTER, 7, 0, 0];

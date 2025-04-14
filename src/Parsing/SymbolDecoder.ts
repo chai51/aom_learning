@@ -1,10 +1,191 @@
 import { BitReader, clone_cdf, FloorLog2, inverseCdf } from "../Conventions";
-import * as AV1 from "../define";
+import { EC_MIN_PROB, EC_PROB_SHIFT, INT16_MAX } from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { CoeffCdfs, NonCoeffCdfs } from "../SyntaxStructures/Semantics";
 
 import { assert } from "console";
+
+/**
+ * 8.2 Parsing process for symbol decoder
+ *
+ * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#parsing-process-for-symbol-decoder)
+ */
+export class SymbolDecoder {
+  TileIntraFrameYModeCdf: number[][][] = [];
+  Tile_non_coeff_cdfs: NonCoeffCdfs = {} as any;
+  Tile_coeff_cdfs: CoeffCdfs = {} as any;
+
+  private SymbolValue: number = undefined as any;
+  private SymbolRange: number = undefined as any;
+  private SymbolMaxBits: number = undefined as any;
+  private decoder: AV1Decoder;
+  private reader: BitReader;
+
+  constructor(d: AV1Decoder) {
+    this.decoder = d;
+    this.reader = new BitReader(d);
+  }
+
+  /**
+   * 8.2.2 Initialization process for symbol decoder
+   *
+   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#initialization-process-for-symbol-decoder)
+   */
+  init_symbol(sz: number) {
+    const reader = this.decoder.reader;
+    const fh = this.decoder.frameHeaderObu.frameHeader;
+    const qp = fh.quantization_params;
+    const tncc = this.Tile_non_coeff_cdfs;
+    const tcc = this.Tile_coeff_cdfs;
+
+    assert(
+      reader.get_position() % 8 == 0,
+      "The bit position will always be byte aligned when init_symbol is invoked because the uncompressed header and the data partitions are always a whole number of bytes long."
+    );
+
+    let idx = 3;
+    if (qp.base_q_idx <= 20) {
+      idx = 0;
+    } else if (qp.base_q_idx <= 60) {
+      idx = 1;
+    } else if (qp.base_q_idx <= 120) {
+      idx = 2;
+    }
+
+    this.reader.initialize(reader.byte(sz));
+
+    let numBits = Math.min(sz * 8, 15);
+    let buf = this.reader.f(numBits);
+    let paddedBuf = buf << (15 - numBits);
+    this.SymbolValue = INT16_MAX ^ paddedBuf;
+    this.SymbolRange = 1 << 15;
+    this.SymbolMaxBits = 8 * sz - 15;
+
+    this.TileIntraFrameYModeCdf = inverseCdf(Default_Intra_Frame_Y_Mode_Cdf);
+    clone_cdf(this.Tile_non_coeff_cdfs, fh.non_coeff_cdfs);
+    clone_cdf(this.Tile_coeff_cdfs, fh.coeff_cdfs);
+  }
+
+  /**
+   * 8.2.3 Boolean decoding process
+   *
+   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#boolean-decoding-process)
+   */
+  read_bool() {
+    /** store the inverse cdf */
+    let cdf: number[] = [1 << 14, 0, 0];
+    return this.read_symbol(cdf, { cdf_update: false });
+  }
+
+  /**
+   * 8.2.4 Exit process for symbol decoder
+   *
+   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#exit-process-for-symbol-decoder)
+   */
+  exit_symbol() {
+    const fho = this.decoder.frameHeaderObu;
+    const fh = fho.frameHeader;
+    const ti = fh.tile_info;
+
+    assert(this.SymbolMaxBits >= -14, "It is a requirement of bitstream conformance that SymbolMaxBits is greater than or equal to -14 whenever this process is invoked.");
+
+    let paddingEndPosition = this.reader.get_position();
+    let trailingBitPosition = this.reader.get_position() - Math.min(15, this.SymbolMaxBits + 15);
+    this.reader.seek(trailingBitPosition);
+    assert(this.reader.f(1), "It is a requirement of bitstream conformance that the bit at position trailingBitPosition is equal to 1.");
+    this.reader.seek(paddingEndPosition);
+
+    assert(paddingEndPosition % 8 == 0, "paddingEndPosition will always be a multiple of 8 indicating that the bit position is byte aligned.");
+    while (this.reader.get_position() < this.reader.get_tell_position()) {
+      assert(
+        this.reader.f(8) == 0,
+        "It is a requirement of bitstream conformance that the bit at position x is equal to 0 for values of x strictly between trailingBitPosition and paddingEndPosition."
+      );
+    }
+
+    if (fh.disable_frame_end_update_cdf == 0 && fh.TileNum == ti.context_update_tile_id) {
+      fho.frame_end_saved_cdf();
+    }
+  }
+
+  /**
+   * 8.2.5 Parsing process for read_literal
+   *
+   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#parsing-process-for-read_literal)
+   */
+  read_literal(n: number) {
+    let x = 0;
+    for (let i = 0; i < n; i++) {
+      x = 2 * x + this.read_bool();
+    }
+    return x;
+  }
+
+  /**
+   * 8.2.6 Symbol decoding process
+   *
+   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#symbol-decoding-process)
+   */
+  read_symbol(cdf: number[], data?: { cdf_update: false }) {
+    const fh = this.decoder.frameHeaderObu.frameHeader;
+
+    let N = cdf.length - 1;
+    assert(N > 1 && cdf[N - 1] == 0, "When this process is invoked, N will be greater than 1 and cdf[ N-1 ] will be equal to 1 << 15.");
+
+    let prev: number;
+    let cur = this.SymbolRange;
+    let symbol = -1;
+    do {
+      symbol++;
+      prev = cur;
+
+      /** store the inverse cdf */
+      let f = cdf[symbol];
+
+      cur = ((this.SymbolRange >> 8) * (f >> EC_PROB_SHIFT)) >> (7 - EC_PROB_SHIFT);
+      cur += EC_MIN_PROB * (N - symbol - 1);
+    } while (this.SymbolValue < cur);
+
+    this.SymbolRange = prev - cur;
+    this.SymbolValue = this.SymbolValue - cur;
+
+    // 1.
+    let bits = 15 - FloorLog2(this.SymbolRange);
+    if (bits != 0) {
+      // 2.
+      this.SymbolRange = this.SymbolRange << bits;
+      // 3.
+      let numBits = Math.min(bits, Math.max(0, this.SymbolMaxBits));
+      // 4.
+      let newData = this.reader.f(numBits);
+      // 5.
+      let paddedData = newData << (bits - numBits);
+      // 6.
+      this.SymbolValue = paddedData ^ (((this.SymbolValue + 1) << bits) - 1);
+      // 7.
+      this.SymbolMaxBits = this.SymbolMaxBits - bits;
+    }
+
+    if (fh.disable_cdf_update == 0 && (data == undefined || data.cdf_update != false)) {
+      let rate = 3 + Number(cdf[N] > 15) + Number(cdf[N] > 31) + Math.min(FloorLog2(N), 2);
+      let tmp = 1 << 15;
+      for (let i = 0; i < N - 1; i++) {
+        /** store the inverse cdf */
+        tmp = i === symbol ? 0 : tmp;
+
+        if (tmp < cdf[i]) {
+          cdf[i] -= (cdf[i] - tmp) >> rate;
+        } else {
+          cdf[i] += (tmp - cdf[i]) >> rate;
+        }
+      }
+      cdf[N] += Number(cdf[N] < 32);
+      // console.info(`${JSON.stringify(cdf).replace(/\[/g, "{").replace(/\]/g, "}")},`);
+    }
+    return symbol;
+  }
+}
 
 const Default_Intra_Frame_Y_Mode_Cdf = [
   [
@@ -4963,183 +5144,3 @@ const Default_Coeff_Br_Cdf = [
     ],
   ],
 ];
-
-/**
- * 8.2 Parsing process for symbol decoder
- *
- * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#parsing-process-for-symbol-decoder)
- */
-export class SymbolDecoder {
-  TileIntraFrameYModeCdf: number[][][] = [];
-  Tile_non_coeff_cdfs: NonCoeffCdfs = {} as any;
-  Tile_coeff_cdfs: CoeffCdfs = {} as any;
-
-  private SymbolValue: number = undefined as any;
-  private SymbolRange: number = undefined as any;
-  private SymbolMaxBits: number = undefined as any;
-  private decoder: AV1Decoder;
-  private reader: BitReader;
-
-  constructor(d: AV1Decoder) {
-    this.decoder = d;
-    this.reader = new BitReader(d);
-  }
-
-  /**
-   * 8.2.2 Initialization process for symbol decoder
-   *
-   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#initialization-process-for-symbol-decoder)
-   */
-  init_symbol(sz: number) {
-    const reader = this.decoder.reader;
-    const fh = this.decoder.frameHeaderObu.frameHeader;
-    const qp = fh.quantization_params;
-    const tncc = this.Tile_non_coeff_cdfs;
-    const tcc = this.Tile_coeff_cdfs;
-
-    assert(
-      reader.get_position() % 8 == 0,
-      "The bit position will always be byte aligned when init_symbol is invoked because the uncompressed header and the data partitions are always a whole number of bytes long."
-    );
-
-    let idx = 3;
-    if (qp.base_q_idx <= 20) {
-      idx = 0;
-    } else if (qp.base_q_idx <= 60) {
-      idx = 1;
-    } else if (qp.base_q_idx <= 120) {
-      idx = 2;
-    }
-
-    this.reader.initialize(reader.byte(sz));
-
-    let numBits = Math.min(sz * 8, 15);
-    let buf = this.reader.f(numBits);
-    let paddedBuf = buf << (15 - numBits);
-    this.SymbolValue = AV1.INT16_MAX ^ paddedBuf;
-    this.SymbolRange = 1 << 15;
-    this.SymbolMaxBits = 8 * sz - 15;
-
-    this.TileIntraFrameYModeCdf = inverseCdf(Default_Intra_Frame_Y_Mode_Cdf);
-    clone_cdf(this.Tile_non_coeff_cdfs, fh.non_coeff_cdfs);
-    clone_cdf(this.Tile_coeff_cdfs, fh.coeff_cdfs);
-  }
-
-  /**
-   * 8.2.3 Boolean decoding process
-   *
-   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#boolean-decoding-process)
-   */
-  read_bool() {
-    /** store the inverse cdf */
-    let cdf: number[] = [1 << 14, 0, 0];
-    return this.read_symbol(cdf, { cdf_update: false });
-  }
-
-  /**
-   * 8.2.4 Exit process for symbol decoder
-   *
-   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#exit-process-for-symbol-decoder)
-   */
-  exit_symbol() {
-    const fho = this.decoder.frameHeaderObu;
-    const fh = fho.frameHeader;
-    const ti = fh.tile_info;
-
-    assert(this.SymbolMaxBits >= -14, "It is a requirement of bitstream conformance that SymbolMaxBits is greater than or equal to -14 whenever this process is invoked.");
-
-    let paddingEndPosition = this.reader.get_position();
-    let trailingBitPosition = this.reader.get_position() - Math.min(15, this.SymbolMaxBits + 15);
-    this.reader.seek(trailingBitPosition);
-    assert(this.reader.f(1), "It is a requirement of bitstream conformance that the bit at position trailingBitPosition is equal to 1.");
-    this.reader.seek(paddingEndPosition);
-
-    assert(paddingEndPosition % 8 == 0, "paddingEndPosition will always be a multiple of 8 indicating that the bit position is byte aligned.");
-    while (this.reader.get_position() < this.reader.get_tell_position()) {
-      assert(
-        this.reader.f(8) == 0,
-        "It is a requirement of bitstream conformance that the bit at position x is equal to 0 for values of x strictly between trailingBitPosition and paddingEndPosition."
-      );
-    }
-
-    if (fh.disable_frame_end_update_cdf == 0 && fh.TileNum == ti.context_update_tile_id) {
-      fho.frame_end_saved_cdf();
-    }
-  }
-
-  /**
-   * 8.2.5 Parsing process for read_literal
-   *
-   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#parsing-process-for-read_literal)
-   */
-  read_literal(n: number) {
-    let x = 0;
-    for (let i = 0; i < n; i++) {
-      x = 2 * x + this.read_bool();
-    }
-    return x;
-  }
-
-  /**
-   * 8.2.6 Symbol decoding process
-   *
-   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#symbol-decoding-process)
-   */
-  read_symbol(cdf: number[], data?: { cdf_update: false }) {
-    const fh = this.decoder.frameHeaderObu.frameHeader;
-
-    let N = cdf.length - 1;
-    assert(N > 1 && cdf[N - 1] == 0, "When this process is invoked, N will be greater than 1 and cdf[ N-1 ] will be equal to 1 << 15.");
-
-    let prev: number;
-    let cur = this.SymbolRange;
-    let symbol = -1;
-    do {
-      symbol++;
-      prev = cur;
-
-      /** store the inverse cdf */
-      let f = cdf[symbol];
-
-      cur = ((this.SymbolRange >> 8) * (f >> AV1.EC_PROB_SHIFT)) >> (7 - AV1.EC_PROB_SHIFT);
-      cur += AV1.EC_MIN_PROB * (N - symbol - 1);
-    } while (this.SymbolValue < cur);
-
-    this.SymbolRange = prev - cur;
-    this.SymbolValue = this.SymbolValue - cur;
-
-    // 1.
-    let bits = 15 - FloorLog2(this.SymbolRange);
-    if (bits != 0) {
-      // 2.
-      this.SymbolRange = this.SymbolRange << bits;
-      // 3.
-      let numBits = Math.min(bits, Math.max(0, this.SymbolMaxBits));
-      // 4.
-      let newData = this.reader.f(numBits);
-      // 5.
-      let paddedData = newData << (bits - numBits);
-      // 6.
-      this.SymbolValue = paddedData ^ (((this.SymbolValue + 1) << bits) - 1);
-      // 7.
-      this.SymbolMaxBits = this.SymbolMaxBits - bits;
-    }
-
-    if (fh.disable_cdf_update == 0 && (data == undefined || data.cdf_update != false)) {
-      let rate = 3 + Number(cdf[N] > 15) + Number(cdf[N] > 31) + Math.min(FloorLog2(N), 2);
-      let tmp = 1 << 15;
-      for (let i = 0; i < N - 1; i++) {
-        /** store the inverse cdf */
-        tmp = i === symbol ? 0 : tmp;
-
-        if (tmp < cdf[i]) {
-          cdf[i] -= (cdf[i] - tmp) >> rate;
-        } else {
-          cdf[i] += (tmp - cdf[i]) >> rate;
-        }
-      }
-      cdf[N] += Number(cdf[N] < 32);
-    }
-    return symbol;
-  }
-}

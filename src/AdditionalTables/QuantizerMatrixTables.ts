@@ -2,11 +2,57 @@ import { integer } from "../Conventions";
 import { Tx_Height, Tx_Width } from "./ConversionTables";
 
 /**
+ * 9.5 Quantizer matrix tables
+ *
+ * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#quantizer-matrix-tables)
+ */
+class QuantizerMatrixTables {
+  /**
+   * 9.5.2 Derivation process (Informative)
+   *
+   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#derivation-process-informative)
+   */
+  derivation(txSz: number) {
+    let fundamentalMatrix: number[] = [];
+    let width = 16;
+    let height = 32;
+    if (Tx_Width[txSz] == Tx_Height[txSz]) {
+      width = 32;
+      height = 32;
+      // TODO
+    } else if (Tx_Width[txSz] > Tx_Height[txSz]) {
+      width = 32;
+      height = 16;
+      // TODO
+    } else {
+      // TODO
+    }
+
+    let fW = width;
+    let fH = height;
+    let ratioW = integer(fW / Tx_Width[txSz]);
+    let ratioH = integer(fH / Tx_Height[txSz]);
+    let phaseW = integer((ratioW + 1) / 2) - 1;
+    let phaseH = integer((ratioH + 1) / 2) - 1;
+
+    let derivedMatrix: number[] = [];
+    for (let i = 0; i < Tx_Height[txSz]; i++) {
+      for (let j = 0; j < Tx_Width[txSz]; j++) {
+        derivedMatrix[i * Tx_Width[txSz] + j] = fundamentalMatrix[(ratioH * i + phaseH) * fW + ratioW * j + phaseW];
+      }
+    }
+
+    return Tx_Width[txSz] * Tx_Height[txSz];
+  }
+}
+
+/**
  * 9.5.3 Tables
  *
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#tables)
  */
 export const Qm_Offset = [0, 16, 80, 336, 336, 1360, 1392, 1424, 1552, 1680, 2192, 336, 336, 2704, 2768, 2832, 3088, 1680, 2192];
+
 export const Quantizer_Matrix = [
   [
     [
@@ -2533,48 +2579,3 @@ export const Quantizer_Matrix = [
     ],
   ],
 ];
-
-/**
- * 9.5 Quantizer matrix tables
- *
- * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#quantizer-matrix-tables)
- */
-class QuantizerMatrixTables {
-  /**
-   * 9.5.2 Derivation process (Informative)
-   *
-   * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#derivation-process-informative)
-   */
-  derivation(txSz: number) {
-    let fundamentalMatrix: number[] = [];
-    let width = 16;
-    let height = 32;
-    if (Tx_Width[txSz] == Tx_Height[txSz]) {
-      width = 32;
-      height = 32;
-      // TODO
-    } else if (Tx_Width[txSz] > Tx_Height[txSz]) {
-      width = 32;
-      height = 16;
-      // TODO
-    } else {
-      // TODO
-    }
-
-    let fW = width;
-    let fH = height;
-    let ratioW = integer(fW / Tx_Width[txSz]);
-    let ratioH = integer(fH / Tx_Height[txSz]);
-    let phaseW = integer((ratioW + 1) / 2) - 1;
-    let phaseH = integer((ratioH + 1) / 2) - 1;
-
-    let derivedMatrix: number[] = [];
-    for (let i = 0; i < Tx_Height[txSz]; i++) {
-      for (let j = 0; j < Tx_Width[txSz]; j++) {
-        derivedMatrix[i * Tx_Width[txSz] + j] = fundamentalMatrix[(ratioH * i + phaseH) * fW + ratioW * j + phaseW];
-      }
-    }
-
-    return Tx_Width[txSz] * Tx_Height[txSz];
-  }
-}

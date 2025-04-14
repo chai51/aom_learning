@@ -1,6 +1,6 @@
 import { assert } from "console";
 import { AV1Decoder } from "./SyntaxStructures/Obu";
-import { COMP_REF_TYPE, UV_MODE } from "./SyntaxStructures/Semantics";
+import { COMP_REF_TYPE, Y_MODE } from "./SyntaxStructures/Semantics";
 import { UINT32_MAX } from "./define";
 
 /**
@@ -274,15 +274,15 @@ export class BitReader {
   }
 
   S(name: "use_intrabc", data?: any): number;
-  S(name: "intra_frame_y_mode", data?: any): UV_MODE;
+  S(name: "intra_frame_y_mode", data?: any): Y_MODE;
   S(name: "y_mode", data?: any): number;
-  S(name: "uv_mode", data?: any): UV_MODE;
+  S(name: "uv_mode", data?: any): Y_MODE;
   S(name: "angle_delta_y", data?: any): number;
   S(name: "angle_delta_uv", data?: any): number;
   S(name: "partition", data: { r: number; c: number; bSize: number }): number;
   S(name: "split_or_horz", data: { r: number; c: number; bSize: number }): number;
   S(name: "split_or_vert", data: { r: number; c: number; bSize: number }): number;
-  S(name: "tx_depth", data?: any): number;
+  S(name: "tx_depth", data: { maxRectTxSize: number; maxTxDepth: number }): number;
   S(name: "txfm_split", data?: any): number;
   S(name: "segment_id", data?: any): number;
   S(name: "seg_id_predicted", data?: any): number;
@@ -552,12 +552,12 @@ export function clone_cdf(dst: any, src: any, clearCount?: boolean) {
 
 export function listCompare(a: number[], b: number[]) {
   if (a.length != a.length) {
-    return false;
+    return a.length - b.length;
   }
   for (let i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) {
-      return false;
+    if (a[i] !== b[i]) {
+      return a[i] - b[i];
     }
   }
-  return true;
+  return 0;
 }

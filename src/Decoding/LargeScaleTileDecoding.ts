@@ -1,11 +1,11 @@
 import { Array2D, clone, integer } from "../Conventions";
-import * as AV1 from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { FRAME_TYPE, SUB_SIZE } from "../SyntaxStructures/Semantics";
 
 import { assert } from "console";
 import { Num_4x4_Blocks_Wide } from "../AdditionalTables/ConversionTables";
+import { MI_SIZE } from "../define";
 
 /**
  * 7.3 Large scale tile decoding process
@@ -146,8 +146,8 @@ export class LargeScaleTileDecoding {
     assert(cc.mono_chrome == 0, "mono_chrome is equal to 0");
     assert(this.TileHeight == (seqHeader.use_128x128_superblock ? 128 : 64), "TileHeight is equal to (use_128x128_superblock ? 128 : 64) for all tiles");
     assert(this.TileWidth % this.TileHeight == 0, "TileWidth is identical for all tiles and is an integer multiple of TileHeight");
-    assert(fs.FrameWidth == cis.MiCols * AV1.MI_SIZE, "FrameWidth is equal to MiCols * MI_SIZE");
-    assert(fs.FrameHeight == cis.MiRows * AV1.MI_SIZE, "FrameHeight is equal to MiRows * MI_SIZE");
+    assert(fs.FrameWidth == cis.MiCols * MI_SIZE, "FrameWidth is equal to MiCols * MI_SIZE");
+    assert(fs.FrameHeight == cis.MiRows * MI_SIZE, "FrameHeight is equal to MiRows * MI_SIZE");
     assert(fh.show_existing_frame == 0, "show_existing_frame is equal to 0");
     assert(fh.frame_type == FRAME_TYPE.INTER_FRAME, "frame_type is equal to INTER_FRAME");
     assert(fh.show_frame == 1, "show_frame is equal to 1");
@@ -182,6 +182,7 @@ export class LargeScaleTileDecoding {
     const dqp = fh.delta_q_params;
     const tgo = this.decoder.tileGroupObu;
     const tg = tgo.titleGroup;
+    const rf = tg.ref_frames;
     const dt = tg.decode_tile;
     const tl = this.decoder.tileListObu.tileList;
     const tle = tl.tile_list_entry;
@@ -189,6 +190,7 @@ export class LargeScaleTileDecoding {
     const ct = this.decoder.output.cameraTile;
     const sd = this.decoder.symbolDecoder;
 
+    rf.conformance = true;
     tg.CurrentQIndex = qp.base_q_idx;
     sd.init_symbol(tle.tile_data_size_minus_1 + 1);
     tgo.clear_above_context();
@@ -209,14 +211,15 @@ export class LargeScaleTileDecoding {
       }
     }
     sd.exit_symbol();
-    let w = (tg.MiColEnd - tg.MiColStart) * AV1.MI_SIZE;
-    let h = (tg.MiRowEnd - tg.MiRowStart) * AV1.MI_SIZE;
-    let x0 = tg.MiColStart * AV1.MI_SIZE;
-    let y0 = tg.MiRowStart * AV1.MI_SIZE;
+    delete rf.conformance;
+    let w = (tg.MiColEnd - tg.MiColStart) * MI_SIZE;
+    let h = (tg.MiRowEnd - tg.MiRowStart) * MI_SIZE;
+    let x0 = tg.MiColStart * MI_SIZE;
+    let y0 = tg.MiRowStart * MI_SIZE;
     let subX = cc.subsampling_x;
     let subY = cc.subsampling_y;
-    let xC0 = (tg.MiColStart * AV1.MI_SIZE) >> subX;
-    let yC0 = (tg.MiRowStart * AV1.MI_SIZE) >> subY;
+    let xC0 = (tg.MiColStart * MI_SIZE) >> subX;
+    let yC0 = (tg.MiRowStart * MI_SIZE) >> subY;
 
     for (let x = 0; x < w; x++) {
       for (let y = 0; y < h; y++) {
@@ -242,7 +245,7 @@ export class LargeScaleTileDecoding {
    */
   get TileWidth() {
     const tg = this.decoder.tileGroupObu.titleGroup;
-    return (tg.MiColEnd - tg.MiColStart) * AV1.MI_SIZE;
+    return (tg.MiColEnd - tg.MiColStart) * MI_SIZE;
   }
 
   /**
@@ -252,6 +255,6 @@ export class LargeScaleTileDecoding {
    */
   get TileHeight() {
     const tg = this.decoder.tileGroupObu.titleGroup;
-    return (tg.MiRowEnd - tg.MiRowStart) * AV1.MI_SIZE;
+    return (tg.MiRowEnd - tg.MiRowStart) * MI_SIZE;
   }
 }

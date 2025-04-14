@@ -1,11 +1,11 @@
 import { Array2D, Array3D, Clip3, clone, integer, listCompare, Round2Signed } from "../Conventions";
-import * as AV1 from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { PARTITION, REF_FRAME, SUB_SIZE, Y_MODE } from "../SyntaxStructures/Semantics";
 
 import { assert } from "console";
 import { Block_Height, Block_Width, Num_4x4_Blocks_High, Num_4x4_Blocks_Wide } from "../AdditionalTables/ConversionTables";
+import { IDENTITY, LEAST_SQUARES_SAMPLES_MAX, MAX_REF_MV_STACK_SIZE, MI_SIZE, MV_BORDER, REF_CAT_LEVEL, TRANSLATION, WARPEDMODEL_PREC_BITS } from "../define";
 
 /**
  * 7.10 Motion vector prediction processes
@@ -15,8 +15,8 @@ import { Block_Height, Block_Width, Num_4x4_Blocks_High, Num_4x4_Blocks_Wide } f
 export class MotionVectorPrediction {
   NumMvFound: number = undefined as any;
   private NewMvCount: number = undefined as any;
-  RefStackMv: number[][][] = Array3D(32, 3);
-  GlobalMvs: number[][] = Array2D(3);
+  RefStackMv: number[][][] = Array3D(32, 2);
+  GlobalMvs: number[][] = Array2D(2);
   private FoundMatch: number;
   private CloseMatches: number;
   private WeightStack: number[];
@@ -123,7 +123,7 @@ export class MotionVectorPrediction {
     // 15.
     if (numNearest > 0) {
       for (let idx = 0; idx < numNearest; idx++) {
-        this.WeightStack[idx] += AV1.REF_CAT_LEVEL;
+        this.WeightStack[idx] += REF_CAT_LEVEL;
       }
     }
 
@@ -296,23 +296,23 @@ export class MotionVectorPrediction {
     let bh = Block_Height[db.MiSize];
 
     let mv: number[] = [];
-    if (ref == REF_FRAME.INTRA_FRAME || typ == AV1.IDENTITY) {
+    if (ref == REF_FRAME.INTRA_FRAME || typ == IDENTITY) {
       mv[0] = 0;
       mv[1] = 0;
-    } else if (typ == AV1.TRANSLATION) {
-      mv[0] = gmp.gm_params[ref][0] >> (AV1.WARPEDMODEL_PREC_BITS - 3);
-      mv[1] = gmp.gm_params[ref][1] >> (AV1.WARPEDMODEL_PREC_BITS - 3);
+    } else if (typ == TRANSLATION) {
+      mv[0] = gmp.gm_params[ref][0] >> (WARPEDMODEL_PREC_BITS - 3);
+      mv[1] = gmp.gm_params[ref][1] >> (WARPEDMODEL_PREC_BITS - 3);
     } else {
-      let x = db.MiCol * AV1.MI_SIZE + integer(bw / 2) - 1;
-      let y = db.MiRow * AV1.MI_SIZE + integer(bh / 2) - 1;
-      let xc = (gmp.gm_params[ref][2] - (1 << AV1.WARPEDMODEL_PREC_BITS)) * x + gmp.gm_params[ref][3] * y + gmp.gm_params[ref][0];
-      let yc = gmp.gm_params[ref][4] * x + (gmp.gm_params[ref][5] - (1 << AV1.WARPEDMODEL_PREC_BITS)) * y + gmp.gm_params[ref][1];
+      let x = db.MiCol * MI_SIZE + integer(bw / 2) - 1;
+      let y = db.MiRow * MI_SIZE + integer(bh / 2) - 1;
+      let xc = (gmp.gm_params[ref][2] - (1 << WARPEDMODEL_PREC_BITS)) * x + gmp.gm_params[ref][3] * y + gmp.gm_params[ref][0];
+      let yc = gmp.gm_params[ref][4] * x + (gmp.gm_params[ref][5] - (1 << WARPEDMODEL_PREC_BITS)) * y + gmp.gm_params[ref][1];
       if (fh.allow_high_precision_mv) {
-        mv[0] = Round2Signed(yc, AV1.WARPEDMODEL_PREC_BITS - 3);
-        mv[1] = Round2Signed(xc, AV1.WARPEDMODEL_PREC_BITS - 3);
+        mv[0] = Round2Signed(yc, WARPEDMODEL_PREC_BITS - 3);
+        mv[1] = Round2Signed(xc, WARPEDMODEL_PREC_BITS - 3);
       } else {
-        mv[0] = Round2Signed(yc, AV1.WARPEDMODEL_PREC_BITS - 2) * 2;
-        mv[1] = Round2Signed(xc, AV1.WARPEDMODEL_PREC_BITS - 2) * 2;
+        mv[0] = Round2Signed(yc, WARPEDMODEL_PREC_BITS - 2) * 2;
+        mv[1] = Round2Signed(xc, WARPEDMODEL_PREC_BITS - 2) * 2;
       }
     }
     this.lower_mv_precision(mv);
@@ -520,7 +520,7 @@ export class MotionVectorPrediction {
       }
       if (idx < this.NumMvFound) {
         this.WeightStack[idx] += 2;
-      } else if (this.NumMvFound < AV1.MAX_REF_MV_STACK_SIZE) {
+      } else if (this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
         this.RefStackMv[this.NumMvFound][0] = candMv;
         this.WeightStack[this.NumMvFound] = 2;
         this.NumMvFound += 1;
@@ -561,7 +561,7 @@ export class MotionVectorPrediction {
       }
       if (idx < this.NumMvFound) {
         this.WeightStack[idx] += 2;
-      } else if (this.NumMvFound < AV1.MAX_REF_MV_STACK_SIZE) {
+      } else if (this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
         this.RefStackMv[this.NumMvFound][0] = candMv0;
         this.RefStackMv[this.NumMvFound][1] = candMv1;
         this.WeightStack[this.NumMvFound] = 2;
@@ -613,7 +613,7 @@ export class MotionVectorPrediction {
     let large = Number(Math.min(Block_Width[candSize], Block_Height[candSize]) >= 8);
 
     let candMv;
-    if ((candMode == Y_MODE.GLOBALMV || candMode == Y_MODE.GLOBAL_GLOBALMV) && gmp.GmType[rf.RefFrame[0]] > AV1.TRANSLATION && large == 1) {
+    if ((candMode == Y_MODE.GLOBALMV || candMode == Y_MODE.GLOBAL_GLOBALMV) && gmp.GmType[rf.RefFrame[0]] > TRANSLATION && large == 1) {
       candMv = clone(this.GlobalMvs[0]);
     } else {
       candMv = clone(db.Mvs[mvRow][mvCol][candList]);
@@ -628,12 +628,12 @@ export class MotionVectorPrediction {
 
     let idx: number;
     for (idx = 0; idx < this.NumMvFound; idx++) {
-      if (listCompare(candMv, this.RefStackMv[idx][0])) {
+      if (listCompare(candMv, this.RefStackMv[idx][0]) == 0) {
         this.WeightStack[idx] += weight;
         break;
       }
     }
-    if (idx == this.NumMvFound && this.NumMvFound < AV1.MAX_REF_MV_STACK_SIZE) {
+    if (idx == this.NumMvFound && this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
       // a.
       this.RefStackMv[this.NumMvFound][0] = candMv;
 
@@ -663,8 +663,8 @@ export class MotionVectorPrediction {
 
     if (candMode == Y_MODE.GLOBAL_GLOBALMV) {
       for (let refList = 0; refList <= 1; refList++) {
-        if (gmp.GmType[rf.RefFrame[refList]] > AV1.TRANSLATION) {
-          candMvs[refList] = this.GlobalMvs[refList];
+        if (gmp.GmType[rf.RefFrame[refList]] > TRANSLATION) {
+          candMvs[refList] = clone(this.GlobalMvs[refList]);
         }
       }
     }
@@ -674,15 +674,14 @@ export class MotionVectorPrediction {
 
     this.FoundMatch = 1;
 
-    let canWeight = false;
-    for (let idx = 0; idx < this.NumMvFound; idx++) {
-      if (candMvs[0] == this.RefStackMv[idx][0] && candMvs[1] == this.RefStackMv[idx][1]) {
+    let idx: number;
+    for (idx = 0; idx < this.NumMvFound; idx++) {
+      if (listCompare(candMvs[0], this.RefStackMv[idx][0]) == 0 && listCompare(candMvs[1], this.RefStackMv[idx][1]) == 0) {
         this.WeightStack[idx] += weight;
-        canWeight = true;
+        break;
       }
     }
-    if (canWeight) {
-    } else if (this.NumMvFound < AV1.MAX_REF_MV_STACK_SIZE) {
+    if (idx == this.NumMvFound && this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
       // a.
       for (let i = 0; i <= 1; i++) {
         this.RefStackMv[this.NumMvFound][i] = candMvs[i];
@@ -827,7 +826,7 @@ export class MotionVectorPrediction {
           compCount++;
         }
         while (compCount < 2) {
-          combinedMvs[compCount][list] = this.GlobalMvs[list];
+          combinedMvs[compCount][list] = clone(this.GlobalMvs[list]);
           compCount++;
         }
       }
@@ -851,7 +850,7 @@ export class MotionVectorPrediction {
       }
     } else {
       for (let idx = this.NumMvFound; idx < 2; idx++) {
-        this.RefStackMv[idx][0] = this.GlobalMvs[0];
+        this.RefStackMv[idx][0] = clone(this.GlobalMvs[0]);
       }
     }
   }
@@ -898,7 +897,7 @@ export class MotionVectorPrediction {
           }
           let idx: number;
           for (idx = 0; idx < this.NumMvFound; idx++) {
-            if (listCompare(candMv, this.RefStackMv[idx][0])) {
+            if (listCompare(candMv, this.RefStackMv[idx][0]) == 0) {
               break;
             }
           }
@@ -931,8 +930,8 @@ export class MotionVectorPrediction {
       if (idx + 1 < this.NumMvFound) {
         let w0 = this.WeightStack[idx];
         let w1 = this.WeightStack[idx + 1];
-        if (w0 >= AV1.REF_CAT_LEVEL) {
-          if (w1 < AV1.REF_CAT_LEVEL) {
+        if (w0 >= REF_CAT_LEVEL) {
+          if (w1 < REF_CAT_LEVEL) {
             z = 1;
           }
         } else {
@@ -945,8 +944,8 @@ export class MotionVectorPrediction {
     for (let list = 0; list < numLists; list++) {
       for (let idx = 0; idx < this.NumMvFound; idx++) {
         let refMv = this.RefStackMv[idx][list];
-        refMv[0] = tgo.clamp_mv_row(refMv[0], AV1.MV_BORDER + bh * 8);
-        refMv[1] = tgo.clamp_mv_col(refMv[1], AV1.MV_BORDER + bw * 8);
+        refMv[0] = tgo.clamp_mv_row(refMv[0], MV_BORDER + bh * 8);
+        refMv[1] = tgo.clamp_mv_col(refMv[1], MV_BORDER + bw * 8);
         this.RefStackMv[idx][list] = refMv;
       }
     }
@@ -1076,7 +1075,7 @@ export class MotionVectorPrediction {
     const rf = tg.ref_frames;
     const m = tg.mv;
 
-    if (this.NumSamplesScanned >= AV1.LEAST_SQUARES_SAMPLES_MAX) {
+    if (this.NumSamplesScanned >= LEAST_SQUARES_SAMPLES_MAX) {
       return;
     }
 

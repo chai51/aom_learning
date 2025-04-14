@@ -1,5 +1,27 @@
 import { integer } from "../Conventions";
 
+/**
+ * 9.2 Scan tables
+ *
+ * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#scan-tables)
+ */
+export class ScanTables {
+  is_transpose(type: string, w: number, h: number) {
+    const T_wxh = Table[`${type}_Scan_${w}x${h}`] as number[];
+    const T_hxw = Table[`${type}_Scan_${h}x${w}`] as number[];
+    for (let pos = 0; pos < w * h; pos++) {
+      let x1 = T_wxh[pos] % w;
+      let y1 = integer(T_wxh[pos] / w);
+      let x2 = T_hxw[pos] % h;
+      let y2 = integer(T_hxw[pos] / h);
+      if (x1 != y2 || y1 != x2) {
+        return 0;
+      }
+    }
+    return 1;
+  }
+}
+
 export const Default_Scan_4x4 = [0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15];
 
 export const Mcol_Scan_4x4 = [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15];
@@ -249,25 +271,3 @@ const Table = {
   Default_Scan_8x32,
   Default_Scan_32x8,
 } as any;
-
-/**
- * 9.2 Scan tables
- *
- * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#scan-tables)
- */
-export class ScanTables {
-  is_transpose(type: string, w: number, h: number) {
-    const T_wxh = Table[`${type}_Scan_${w}x${h}`] as number[];
-    const T_hxw = Table[`${type}_Scan_${h}x${w}`] as number[];
-    for (let pos = 0; pos < w * h; pos++) {
-      let x1 = T_wxh[pos] % w;
-      let y1 = integer(T_wxh[pos] / w);
-      let x2 = T_hxw[pos] % h;
-      let y2 = integer(T_hxw[pos] / h);
-      if (x1 != y2 || y1 != x2) {
-        return 0;
-      }
-    }
-    return 1;
-  }
-}

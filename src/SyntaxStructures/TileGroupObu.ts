@@ -1,5 +1,3 @@
-import * as AV1 from "../define";
-
 import { Array2D, Array3D, Array4D, Array5D, CeilLog2, Clip1, Clip3, clone, integer, Round2 } from "../Conventions";
 import { AV1Decoder } from "./Obu";
 
@@ -23,7 +21,6 @@ import {
   SUB_SIZE,
   TX_MODE,
   TX_SIZE,
-  UV_MODE,
   Y_MODE,
 } from "./Semantics";
 
@@ -83,158 +80,58 @@ import {
   Mrow_Scan_8x8,
 } from "../AdditionalTables/ScanTables";
 import { Sgr_Params } from "../Decoding/LoopRestoration";
+import {
+  ADST_ADST,
+  ADST_DCT,
+  ADST_FLIPADST,
+  BR_CDF_SIZE,
+  CLASS0_SIZE,
+  COEFF_BASE_RANGE,
+  DCT_ADST,
+  DCT_DCT,
+  DCT_FLIPADST,
+  DELTA_LF_SMALL,
+  DELTA_Q_SMALL,
+  FLIPADST_ADST,
+  FLIPADST_DCT,
+  FLIPADST_FLIPADST,
+  FRAME_LF_COUNT,
+  H_ADST,
+  H_DCT,
+  H_FLIPADST,
+  IDTX,
+  INTRABC_DELAY_PIXELS,
+  INTRABC_DELAY_SB64,
+  MAX_ANGLE_DELTA,
+  MAX_LOOP_FILTER,
+  MAX_VARTX_DEPTH,
+  MI_SIZE,
+  MI_SIZE_LOG2,
+  MV_INTRABC_CONTEXT,
+  NUM_BASE_LEVELS,
+  NUM_REF_FRAMES,
+  PALETTE_COLORS,
+  PALETTE_NUM_NEIGHBORS,
+  REF_SCALE_SHIFT,
+  SEG_LVL_GLOBALMV,
+  SEG_LVL_REF_FRAME,
+  SEG_LVL_SKIP,
+  SGRPROJ_PARAMS_BITS,
+  SGRPROJ_PRJ_BITS,
+  SGRPROJ_PRJ_SUBEXP_K,
+  SUPERRES_NUM,
+  TRANSLATION,
+  TX_SIZES_ALL,
+  UNKNOWN_VALUE,
+  V_ADST,
+  V_DCT,
+  V_FLIPADST,
+  WIENER_COEFFS,
+} from "../define";
 
 const Wiener_Taps_Mid = [3, -7, 15];
 const Sgrproj_Xqd_Mid = [-32, 31];
 const Max_Tx_Depth = [0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 4, 4];
-
-let debugCount = 0;
-let debugCurrent = 0;
-
-const Subsampled_Size = [
-  [
-    [SUB_SIZE.BLOCK_4X4, SUB_SIZE.BLOCK_4X4],
-    [SUB_SIZE.BLOCK_4X4, SUB_SIZE.BLOCK_4X4],
-  ],
-  [
-    [SUB_SIZE.BLOCK_4X8, SUB_SIZE.BLOCK_4X4],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_4X4],
-  ],
-  [
-    [SUB_SIZE.BLOCK_8X4, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_4X4, SUB_SIZE.BLOCK_4X4],
-  ],
-  [
-    [SUB_SIZE.BLOCK_8X8, SUB_SIZE.BLOCK_8X4],
-    [SUB_SIZE.BLOCK_4X8, SUB_SIZE.BLOCK_4X4],
-  ],
-  [
-    [SUB_SIZE.BLOCK_8X16, SUB_SIZE.BLOCK_8X8],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_4X8],
-  ],
-  [
-    [SUB_SIZE.BLOCK_16X8, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_8X8, SUB_SIZE.BLOCK_8X4],
-  ],
-  [
-    [SUB_SIZE.BLOCK_16X16, SUB_SIZE.BLOCK_16X8],
-    [SUB_SIZE.BLOCK_8X16, SUB_SIZE.BLOCK_8X8],
-  ],
-  [
-    [SUB_SIZE.BLOCK_16X32, SUB_SIZE.BLOCK_16X16],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_8X16],
-  ],
-  [
-    [SUB_SIZE.BLOCK_32X16, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_16X16, SUB_SIZE.BLOCK_16X8],
-  ],
-  [
-    [SUB_SIZE.BLOCK_32X32, SUB_SIZE.BLOCK_32X16],
-    [SUB_SIZE.BLOCK_16X32, SUB_SIZE.BLOCK_16X16],
-  ],
-  [
-    [SUB_SIZE.BLOCK_32X64, SUB_SIZE.BLOCK_32X32],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_16X32],
-  ],
-  [
-    [SUB_SIZE.BLOCK_64X32, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_32X32, SUB_SIZE.BLOCK_32X16],
-  ],
-  [
-    [SUB_SIZE.BLOCK_64X64, SUB_SIZE.BLOCK_64X32],
-    [SUB_SIZE.BLOCK_32X64, SUB_SIZE.BLOCK_32X32],
-  ],
-  [
-    [SUB_SIZE.BLOCK_64X128, SUB_SIZE.BLOCK_64X64],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_32X64],
-  ],
-  [
-    [SUB_SIZE.BLOCK_128X64, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_64X64, SUB_SIZE.BLOCK_64X32],
-  ],
-  [
-    [SUB_SIZE.BLOCK_128X128, SUB_SIZE.BLOCK_128X64],
-    [SUB_SIZE.BLOCK_64X128, SUB_SIZE.BLOCK_64X64],
-  ],
-  [
-    [SUB_SIZE.BLOCK_4X16, SUB_SIZE.BLOCK_4X8],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_4X8],
-  ],
-  [
-    [SUB_SIZE.BLOCK_16X4, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_8X4, SUB_SIZE.BLOCK_8X4],
-  ],
-  [
-    [SUB_SIZE.BLOCK_8X32, SUB_SIZE.BLOCK_8X16],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_4X16],
-  ],
-  [
-    [SUB_SIZE.BLOCK_32X8, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_16X8, SUB_SIZE.BLOCK_16X4],
-  ],
-  [
-    [SUB_SIZE.BLOCK_16X64, SUB_SIZE.BLOCK_16X32],
-    [AV1.BLOCK_INVALID, SUB_SIZE.BLOCK_8X32],
-  ],
-  [
-    [SUB_SIZE.BLOCK_64X16, AV1.BLOCK_INVALID],
-    [SUB_SIZE.BLOCK_32X16, SUB_SIZE.BLOCK_32X8],
-  ],
-];
-
-const Tx_Type_In_Set_Intra = [
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
-  [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-];
-const Tx_Type_In_Set_Inter = [
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-];
-
-const Tx_Type_Intra_Inv_Set1 = [AV1.IDTX, AV1.DCT_DCT, AV1.V_DCT, AV1.H_DCT, AV1.ADST_ADST, AV1.ADST_DCT, AV1.DCT_ADST];
-const Tx_Type_Intra_Inv_Set2 = [AV1.IDTX, AV1.DCT_DCT, AV1.ADST_ADST, AV1.ADST_DCT, AV1.DCT_ADST];
-const Tx_Type_Inter_Inv_Set1 = [
-  AV1.IDTX,
-  AV1.V_DCT,
-  AV1.H_DCT,
-  AV1.V_ADST,
-  AV1.H_ADST,
-  AV1.V_FLIPADST,
-  AV1.H_FLIPADST,
-  AV1.DCT_DCT,
-  AV1.ADST_DCT,
-  AV1.DCT_ADST,
-  AV1.FLIPADST_DCT,
-  AV1.DCT_FLIPADST,
-  AV1.ADST_ADST,
-  AV1.FLIPADST_FLIPADST,
-  AV1.ADST_FLIPADST,
-  AV1.FLIPADST_ADST,
-];
-const Tx_Type_Inter_Inv_Set2 = [
-  AV1.IDTX,
-  AV1.V_DCT,
-  AV1.H_DCT,
-  AV1.DCT_DCT,
-  AV1.ADST_DCT,
-  AV1.DCT_ADST,
-  AV1.FLIPADST_DCT,
-  AV1.DCT_FLIPADST,
-  AV1.ADST_ADST,
-  AV1.FLIPADST_FLIPADST,
-  AV1.ADST_FLIPADST,
-  AV1.FLIPADST_ADST,
-];
-const Tx_Type_Inter_Inv_Set3 = [AV1.IDTX, AV1.DCT_DCT];
-
-const Wiener_Taps_Min = [-5, -23, -17];
-const Wiener_Taps_Max = [10, 8, 46];
-const Wiener_Taps_K = [1, 2, 3];
-const Sgrproj_Xqd_Min = [-96, -32];
-const Sgrproj_Xqd_Max = [31, 95];
 
 /**
  * 5.11 Tile group OBU syntax
@@ -250,85 +147,93 @@ export class TileGroupObu {
     this.init = false;
     const plane = 3;
     const pass = 2;
-    const sbSize = 32;
+    const sbSize = 64;
 
     this.titleGroup = {
+      NumTiles: UNKNOWN_VALUE,
+      tg_start: UNKNOWN_VALUE,
+      tg_end: UNKNOWN_VALUE,
+      MiRowStart: UNKNOWN_VALUE,
+      MiRowEnd: UNKNOWN_VALUE,
+      MiColStart: UNKNOWN_VALUE,
+      MiColEnd: UNKNOWN_VALUE,
+      CurrentQIndex: UNKNOWN_VALUE,
       decode_tile: {
         DeltaLF: [],
         RefSgrXqd: Array2D(plane),
         RefLrWiener: Array3D(plane, pass),
-      },
+      } as any,
       block_decoded: {
         BlockDecoded: Array3D(plane, { startIndex: -1, endIndex: sbSize }),
       },
-      decode_partition: {},
-      decode_block: {},
+      decode_partition: {} as any,
+      decode_block: {} as any,
       intra_frame_mode_info: {
         LeftRefFrame: [],
         AboveRefFrame: [],
-      },
+      } as any,
       intra_segment_id: {
         AboveSegPredContext: [],
         LeftSegPredContext: [],
-      },
-      segment_id: {},
-      skip_mode: {},
-      skip: {},
+      } as any,
+      segment_id: {} as any,
+      skip_mode: {} as any,
+      skip: {} as any,
       cdef_params: {
         cdef_y_pri_strength: [],
         cdef_uv_pri_strength: [],
         cdef_y_sec_strength: [],
         cdef_uv_sec_strength: [],
-      },
+      } as any,
       lr_params: {
         FrameRestorationType: [],
         LoopRestorationSize: [],
         LrWiener: Array5D(3, 64, 64, 2),
         LrSgrSet: Array3D(2, 64),
         LrSgrXqd: Array4D(2, 64, 64),
-      },
-      tx_size: {},
+      } as any,
+      tx_size: {} as any,
       block_tx_size: {
         InterTxSizes: Array2D(64),
       },
-      transform_type: {},
-      is_inter: {},
+      transform_type: {} as any,
+      is_inter: {} as any,
       inter_block_mode_info: {
         interp_filter: [],
-      },
-      filter_intra_mode_info: {},
+      } as any,
+      filter_intra_mode_info: {} as any,
       ref_frames: {
         RefFrame: [],
       },
-      motion_mode: {},
-      inter_intra: {},
-      compound_type: {},
+      motion_mode: {} as any,
+      inter_intra: {} as any,
+      compound_type: {} as any,
       mv: {
         Mv: Array2D(2),
         PredMv: Array2D(2),
-      },
-      transform_block: {},
+      } as any,
+      transform_block: {} as any,
       coefficients: {
         Quant: [],
         AboveLevelContext: Array2D(plane),
         LeftLevelContext: Array2D(plane),
         AboveDcContext: Array2D(plane),
         LeftDcContext: Array2D(plane),
-      },
-      intra_angle_info: {},
-      cfl_alphas: {},
+      } as any,
+      intra_angle_info: {} as any,
+      cfl_alphas: {} as any,
       palette_mode_info: {
         palette_colors_y: [],
         palette_colors_u: [],
         palette_colors_v: [],
-      },
+      } as any,
       palette_tokens: {
         ColorMapY: Array2D(64),
         ColorMapUV: Array2D(64),
       },
-      palette_color_context: {},
-      cdef: {},
-    } as any;
+      palette_color_context: {} as any,
+      cdef: {} as any,
+    };
 
     this.decoder = d;
   }
@@ -372,7 +277,7 @@ export class TileGroupObu {
     db.PaletteColors = Array4D(plane, sbRows + bh4, cis.MiCols + bw4);
     db.DeltaLFs = Array3D(sbRows + bh4, cis.MiCols + bw4);
     db.PaletteCache = [];
-    db.SavedSegmentIds = Array3D(AV1.NUM_REF_FRAMES, cis.MiRows);
+    db.SavedSegmentIds = Array3D(NUM_REF_FRAMES, cis.MiRows);
     lp.LrType = Array3D(plane, maxHeight);
     bts.InterTxSizes = Array2D(sbRows + bh4);
     tb.LoopfilterTxSizes = Array3D(plane, sbRows + bh4);
@@ -471,13 +376,13 @@ export class TileGroupObu {
     const dt = tg.decode_tile;
 
     this.clear_above_context();
-    for (let i = 0; i < AV1.FRAME_LF_COUNT; i++) {
+    for (let i = 0; i < FRAME_LF_COUNT; i++) {
       dt.DeltaLF[i] = 0;
     }
     for (let plane = 0; plane < cc.NumPlanes; plane++) {
       for (let pass = 0; pass < 2; pass++) {
         dt.RefSgrXqd[plane][pass] = Sgrproj_Xqd_Mid[pass];
-        for (let i = 0; i < AV1.WIENER_COEFFS; i++) {
+        for (let i = 0; i < WIENER_COEFFS; i++) {
           dt.RefLrWiener[plane][pass][i] = Wiener_Taps_Mid[i];
         }
       }
@@ -502,7 +407,6 @@ export class TileGroupObu {
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#clear-block-decoded-flags-function)
    */
   clear_block_decoded_flags(r: number, c: number, sbSize4: number) {
-    const reader = this.decoder.reader;
     const seqHeader = this.decoder.sequenceHeaderObu.sequenceHeader;
     const cc = seqHeader.color_config;
     const tg = this.titleGroup;
@@ -534,7 +438,7 @@ export class TileGroupObu {
    *
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#decode-partition-syntax)
    */
-  decode_partition(r: number, c: number, bSize: number) {
+  decode_partition(r: number, c: number, bSize: SUB_SIZE) {
     const reader = this.decoder.reader;
     const fh = this.decoder.frameHeaderObu.frameHeader;
     const cis = fh.compute_image_size;
@@ -566,25 +470,10 @@ export class TileGroupObu {
       dp.partition = PARTITION.PARTITION_SPLIT;
     }
 
-    debugCount++;
-    if (debugCount == 1609) {
-      debugCount = 1609;
-    }
-    if (debugCount == 967) {
-      debugCount = 967;
-    }
-
-    if (debugCount == 900) {
-      debugCount = 900;
-    }
-    if (debugCount % 20 == 0) {
-      debugCount = debugCount;
-    }
-
     let subSize = Partition_Subsize[dp.partition][bSize];
     assert(
-      this.get_plane_residual_size(subSize, 1) != AV1.BLOCK_INVALID,
-      "It is a requirement of bitstream conformance that get_plane_residual_size( subSize, 1 ) is not equal to BLOCK_INVALID every time subSize is computed"
+      this.get_plane_residual_size(subSize, 1) != SUB_SIZE.BLOCK_INVALID,
+      "It is a requirement of bitstream conformance that get_plane_residual_size( subSize, 1 ) is not equal to SUB_SIZE.BLOCK_INVALID every time subSize is computed"
     );
     let splitSize = Partition_Subsize[PARTITION.PARTITION_SPLIT][bSize];
     if (dp.partition == PARTITION.PARTITION_NONE) {
@@ -728,7 +617,7 @@ export class TileGroupObu {
         for (let i = 0; i < pmi.PaletteSizeUV; i++) {
           db.PaletteColors[1][r + y][c + x][i] = pmi.palette_colors_u[i];
         }
-        for (let i = 0; i < AV1.FRAME_LF_COUNT; i++) {
+        for (let i = 0; i < FRAME_LF_COUNT; i++) {
           db.DeltaLFs[r + y][c + x][i] = dt.DeltaLF[i];
         }
       }
@@ -828,8 +717,8 @@ export class TileGroupObu {
     }
     if (ifmi.use_intrabc) {
       ii.is_inter = 1;
-      ifmi.YMode = UV_MODE.DC_PRED;
-      ifmi.UVMode = UV_MODE.DC_PRED;
+      ifmi.YMode = Y_MODE.DC_PRED;
+      ifmi.UVMode = Y_MODE.DC_PRED;
       rmm.motion_mode = MOTION_MODE.SIMPLE;
       rct.compound_type = COMPOUND_TYPE.COMPOUND_AVERAGE;
       pmi.PaletteSizeY = 0;
@@ -846,7 +735,7 @@ export class TileGroupObu {
       if (db.HasChroma) {
         ifmi.uv_mode = reader.S("uv_mode");
         ifmi.UVMode = ifmi.uv_mode;
-        if (ifmi.UVMode == UV_MODE.UV_CFL_PRED) {
+        if (ifmi.UVMode == Y_MODE.UV_CFL_PRED) {
           this.read_cfl_alphas();
         }
         this.intra_angle_info_uv();
@@ -956,9 +845,9 @@ export class TileGroupObu {
     const sm = tg.skip_mode;
 
     if (
-      this.seg_feature_active(AV1.SEG_LVL_SKIP) ||
-      this.seg_feature_active(AV1.SEG_LVL_REF_FRAME) ||
-      this.seg_feature_active(AV1.SEG_LVL_GLOBALMV) ||
+      this.seg_feature_active(SEG_LVL_SKIP) ||
+      this.seg_feature_active(SEG_LVL_REF_FRAME) ||
+      this.seg_feature_active(SEG_LVL_GLOBALMV) ||
       !smp.skip_mode_present ||
       Block_Width[db.MiSize] < 8 ||
       Block_Height[db.MiSize] < 8
@@ -981,7 +870,7 @@ export class TileGroupObu {
     const tg = this.titleGroup;
     const s = tg.skip;
 
-    if (sp.SegIdPreSkip && this.seg_feature_active(AV1.SEG_LVL_SKIP)) {
+    if (sp.SegIdPreSkip && this.seg_feature_active(SEG_LVL_SKIP)) {
       s.skip = 1;
     } else {
       s.skip = reader.S("skip");
@@ -1007,7 +896,7 @@ export class TileGroupObu {
     if (db.MiSize == sbSize && s.skip) return;
     if (dt.ReadDeltas) {
       let delta_q_abs = reader.S("delta_q_abs");
-      if (delta_q_abs == AV1.DELTA_Q_SMALL) {
+      if (delta_q_abs == DELTA_Q_SMALL) {
         let delta_q_rem_bits = reader.L(3);
         delta_q_rem_bits++;
         let delta_q_abs_bits = reader.L(delta_q_rem_bits);
@@ -1042,12 +931,12 @@ export class TileGroupObu {
     if (dt.ReadDeltas && dlp.delta_lf_present) {
       let frameLfCount = 1;
       if (dlp.delta_lf_multi) {
-        frameLfCount = cc.NumPlanes > 1 ? AV1.FRAME_LF_COUNT : AV1.FRAME_LF_COUNT - 2;
+        frameLfCount = cc.NumPlanes > 1 ? FRAME_LF_COUNT : FRAME_LF_COUNT - 2;
       }
       for (let i = 0; i < frameLfCount; i++) {
         let delta_lf_abs = reader.S("delta_lf_abs", { i });
         let deltaLfAbs = delta_lf_abs;
-        if (delta_lf_abs == AV1.DELTA_LF_SMALL) {
+        if (delta_lf_abs == DELTA_LF_SMALL) {
           let delta_lf_rem_bits = reader.L(3);
           let n = delta_lf_rem_bits + 1;
           let delta_lf_abs_bits = reader.L(n);
@@ -1056,7 +945,7 @@ export class TileGroupObu {
         if (deltaLfAbs) {
           let delta_lf_sign_bit = reader.L(1);
           let reducedDeltaLfLevel = delta_lf_sign_bit ? -deltaLfAbs : deltaLfAbs;
-          dt.DeltaLF[i] = Clip3(-AV1.MAX_LOOP_FILTER, AV1.MAX_LOOP_FILTER, dt.DeltaLF[i] + (reducedDeltaLfLevel << dlp.delta_lf_res));
+          dt.DeltaLF[i] = Clip3(-MAX_LOOP_FILTER, MAX_LOOP_FILTER, dt.DeltaLF[i] + (reducedDeltaLfLevel << dlp.delta_lf_res));
         }
       }
     }
@@ -1107,7 +996,7 @@ export class TileGroupObu {
     let maxTxDepth = Max_Tx_Depth[db.MiSize];
     ts.TxSize = maxRectTxSize;
     if (db.MiSize > SUB_SIZE.BLOCK_4X4 && allowSelect && rtm.TxMode == TX_MODE.TX_MODE_SELECT) {
-      let tx_depth = reader.S("tx_depth", { maxRectTxSize });
+      let tx_depth = reader.S("tx_depth", { maxRectTxSize, maxTxDepth });
       for (let i = 0; i < tx_depth; i++) {
         ts.TxSize = Split_Tx_Size[ts.TxSize];
       }
@@ -1134,8 +1023,8 @@ export class TileGroupObu {
     let bh4 = Num_4x4_Blocks_High[db.MiSize];
     if (rtm.TxMode == TX_MODE.TX_MODE_SELECT && db.MiSize > SUB_SIZE.BLOCK_4X4 && ii.is_inter && !s.skip && !isi.Lossless) {
       let maxTxSz = Max_Tx_Size_Rect[db.MiSize];
-      let txW4 = Tx_Width[maxTxSz] / AV1.MI_SIZE;
-      let txH4 = Tx_Height[maxTxSz] / AV1.MI_SIZE;
+      let txW4 = Tx_Width[maxTxSz] / MI_SIZE;
+      let txH4 = Tx_Height[maxTxSz] / MI_SIZE;
       for (let row = db.MiRow; row < db.MiRow + bh4; row += txH4)
         for (let col = db.MiCol; col < db.MiCol + bw4; col += txW4) {
           this.read_var_tx_size(row, col, maxTxSz, 0);
@@ -1164,17 +1053,17 @@ export class TileGroupObu {
 
     if (row >= cis.MiRows || col >= cis.MiCols) return;
     let txfm_split: number;
-    if (txSz == TX_SIZE.TX_4X4 || depth == AV1.MAX_VARTX_DEPTH) {
+    if (txSz == TX_SIZE.TX_4X4 || depth == MAX_VARTX_DEPTH) {
       txfm_split = 0;
     } else {
       txfm_split = reader.S("txfm_split", { row, col, txSz });
     }
-    let w4 = Tx_Width[txSz] / AV1.MI_SIZE;
-    let h4 = Tx_Height[txSz] / AV1.MI_SIZE;
+    let w4 = Tx_Width[txSz] / MI_SIZE;
+    let h4 = Tx_Height[txSz] / MI_SIZE;
     if (txfm_split) {
       let subTxSz = Split_Tx_Size[txSz];
-      let stepW = Tx_Width[subTxSz] / AV1.MI_SIZE;
-      let stepH = Tx_Height[subTxSz] / AV1.MI_SIZE;
+      let stepW = Tx_Width[subTxSz] / MI_SIZE;
+      let stepH = Tx_Height[subTxSz] / MI_SIZE;
       for (let i = 0; i < h4; i += stepH)
         for (let j = 0; j < w4; j += stepW) {
           this.read_var_tx_size(row + i, col + j, subTxSz, depth + 1);
@@ -1234,7 +1123,9 @@ export class TileGroupObu {
     this.read_is_inter();
     if (ii.is_inter) {
       this.inter_block_mode_info();
-    } else this.intra_block_mode_info();
+    } else {
+      this.intra_block_mode_info();
+    }
   }
 
   /**
@@ -1309,9 +1200,9 @@ export class TileGroupObu {
 
     if (sm.skip_mode) {
       ii.is_inter = 1;
-    } else if (this.seg_feature_active(AV1.SEG_LVL_REF_FRAME)) {
-      ii.is_inter = Number(sp.FeatureData[si.segment_id][AV1.SEG_LVL_REF_FRAME] != REF_FRAME.INTRA_FRAME);
-    } else if (this.seg_feature_active(AV1.SEG_LVL_GLOBALMV)) {
+    } else if (this.seg_feature_active(SEG_LVL_REF_FRAME)) {
+      ii.is_inter = Number(sp.FeatureData[si.segment_id][SEG_LVL_REF_FRAME] != REF_FRAME.INTRA_FRAME);
+    } else if (this.seg_feature_active(SEG_LVL_GLOBALMV)) {
       ii.is_inter = 1;
     } else {
       ii.is_inter = reader.S("is_inter");
@@ -1364,7 +1255,7 @@ export class TileGroupObu {
     if (db.HasChroma) {
       ifmi.uv_mode = reader.S("uv_mode");
       ifmi.UVMode = ifmi.uv_mode;
-      if (ifmi.UVMode == UV_MODE.UV_CFL_PRED) {
+      if (ifmi.UVMode == Y_MODE.UV_CFL_PRED) {
         this.read_cfl_alphas();
       }
       this.intra_angle_info_uv();
@@ -1400,7 +1291,7 @@ export class TileGroupObu {
     mvp.find_mv_stack(isCompound);
     if (sm.skip_mode) {
       ifmi.YMode = Y_MODE.NEAREST_NEARESTMV;
-    } else if (this.seg_feature_active(AV1.SEG_LVL_SKIP) || this.seg_feature_active(AV1.SEG_LVL_GLOBALMV)) {
+    } else if (this.seg_feature_active(SEG_LVL_SKIP) || this.seg_feature_active(SEG_LVL_GLOBALMV)) {
       ifmi.YMode = Y_MODE.GLOBALMV;
     } else if (isCompound) {
       let compound_mode = reader.S("compound_mode");
@@ -1497,9 +1388,9 @@ export class TileGroupObu {
     if (sm.skip_mode || rmm.motion_mode == MOTION_MODE.LOCALWARP) {
       return 0;
     } else if (large && ifmi.YMode == Y_MODE.GLOBALMV) {
-      return gmp.GmType[rf.RefFrame[0]] == AV1.TRANSLATION;
+      return gmp.GmType[rf.RefFrame[0]] == TRANSLATION;
     } else if (large && ifmi.YMode == Y_MODE.GLOBAL_GLOBALMV) {
-      return gmp.GmType[rf.RefFrame[0]] == AV1.TRANSLATION || gmp.GmType[rf.RefFrame[1]] == AV1.TRANSLATION;
+      return gmp.GmType[rf.RefFrame[0]] == TRANSLATION || gmp.GmType[rf.RefFrame[1]] == TRANSLATION;
     } else {
       return 1;
     }
@@ -1520,7 +1411,7 @@ export class TileGroupObu {
     const pmi = tg.palette_mode_info;
 
     fimi.use_filter_intra = 0;
-    if (seqHeader.enable_filter_intra && ifmi.YMode == UV_MODE.DC_PRED && pmi.PaletteSizeY == 0 && Math.max(Block_Width[db.MiSize], Block_Height[db.MiSize]) <= 32) {
+    if (seqHeader.enable_filter_intra && ifmi.YMode == Y_MODE.DC_PRED && pmi.PaletteSizeY == 0 && Math.max(Block_Width[db.MiSize], Block_Height[db.MiSize]) <= 32) {
       fimi.use_filter_intra = reader.S("use_filter_intra");
       if (fimi.use_filter_intra) {
         fimi.filter_intra_mode = reader.S("filter_intra_mode");
@@ -1548,10 +1439,10 @@ export class TileGroupObu {
     if (sm.skip_mode) {
       rf.RefFrame[0] = smp.SkipModeFrame[0];
       rf.RefFrame[1] = smp.SkipModeFrame[1];
-    } else if (this.seg_feature_active(AV1.SEG_LVL_REF_FRAME)) {
-      rf.RefFrame[0] = sp.FeatureData[si.segment_id][AV1.SEG_LVL_REF_FRAME];
+    } else if (this.seg_feature_active(SEG_LVL_REF_FRAME)) {
+      rf.RefFrame[0] = sp.FeatureData[si.segment_id][SEG_LVL_REF_FRAME];
       rf.RefFrame[1] = REF_FRAME.NONE;
-    } else if (this.seg_feature_active(AV1.SEG_LVL_SKIP) || this.seg_feature_active(AV1.SEG_LVL_GLOBALMV)) {
+    } else if (this.seg_feature_active(SEG_LVL_SKIP) || this.seg_feature_active(SEG_LVL_GLOBALMV)) {
       rf.RefFrame[0] = REF_FRAME.LAST_FRAME;
       rf.RefFrame[1] = REF_FRAME.NONE;
     } else {
@@ -1624,8 +1515,10 @@ export class TileGroupObu {
         rf.RefFrame[1] = REF_FRAME.NONE;
       }
     }
-    // assert(rf.RefFrame[0] == REF_FRAME.LAST_FRAME, "RefFrame[ 0 ] = LAST_FRAME");
-    assert(rf.RefFrame[1] == REF_FRAME.NONE, "RefFrame[ 1 ] = NONE");
+    if (rf.conformance) {
+      assert(rf.RefFrame[0] == REF_FRAME.LAST_FRAME, "RefFrame[ 0 ] = LAST_FRAME");
+      assert(rf.RefFrame[1] == REF_FRAME.NONE, "RefFrame[ 1 ] = NONE");
+    }
   }
 
   /**
@@ -1643,7 +1536,7 @@ export class TileGroupObu {
     const mvp = this.decoder.motionVectorPrediction;
 
     for (let i = 0; i < 1 + isCompound; i++) {
-      let compMode: UV_MODE | Y_MODE;
+      let compMode: Y_MODE;
       if (ifmi.use_intrabc) {
         compMode = Y_MODE.NEWMV;
       } else {
@@ -1659,20 +1552,20 @@ export class TileGroupObu {
           let sbSize4 = Num_4x4_Blocks_High[sbSize];
           if (db.MiRow - sbSize4 < tg.MiRowStart) {
             m.PredMv[0][0] = 0;
-            m.PredMv[0][1] = -(sbSize4 * AV1.MI_SIZE + AV1.INTRABC_DELAY_PIXELS) * 8;
+            m.PredMv[0][1] = -(sbSize4 * MI_SIZE + INTRABC_DELAY_PIXELS) * 8;
           } else {
-            m.PredMv[0][0] = -(sbSize4 * AV1.MI_SIZE * 8);
+            m.PredMv[0][0] = -(sbSize4 * MI_SIZE * 8);
             m.PredMv[0][1] = 0;
           }
         }
       } else if (compMode == Y_MODE.GLOBALMV) {
-        m.PredMv[i] = mvp.GlobalMvs[i];
+        m.PredMv[i] = clone(mvp.GlobalMvs[i]);
       } else {
         let pos = compMode == Y_MODE.NEARESTMV ? 0 : ibmi.RefMvIdx;
         if (compMode == Y_MODE.NEWMV && mvp.NumMvFound <= 1) {
           pos = 0;
         }
-        m.PredMv[i] = mvp.RefStackMv[pos][i];
+        m.PredMv[i] = clone(mvp.RefStackMv[pos][i]);
       }
       if (compMode == Y_MODE.NEWMV) {
         this.read_mv(i);
@@ -1713,7 +1606,7 @@ export class TileGroupObu {
       return;
     }
     if (!fh.force_integer_mv && (ifmi.YMode == Y_MODE.GLOBALMV || ifmi.YMode == Y_MODE.GLOBAL_GLOBALMV)) {
-      if (gmp.GmType[rf.RefFrame[0]] > AV1.TRANSLATION) {
+      if (gmp.GmType[rf.RefFrame[0]] > TRANSLATION) {
         rmm.motion_mode = MOTION_MODE.SIMPLE;
         return;
       }
@@ -1742,9 +1635,9 @@ export class TileGroupObu {
     const rf = fh.ref_frames;
 
     let refIdx = fh.ref_frame_idx[refFrame - REF_FRAME.LAST_FRAME];
-    let xScale = integer(((rf.RefUpscaledWidth[refIdx] << AV1.REF_SCALE_SHIFT) + integer(fs.FrameWidth / 2)) / fs.FrameWidth);
-    let yScale = integer(((rf.RefFrameHeight[refIdx] << AV1.REF_SCALE_SHIFT) + integer(fs.FrameHeight / 2)) / fs.FrameHeight);
-    let noScale = 1 << AV1.REF_SCALE_SHIFT;
+    let xScale = integer(((rf.RefUpscaledWidth[refIdx] << REF_SCALE_SHIFT) + integer(fs.FrameWidth / 2)) / fs.FrameWidth);
+    let yScale = integer(((rf.RefFrameHeight[refIdx] << REF_SCALE_SHIFT) + integer(fs.FrameHeight / 2)) / fs.FrameHeight);
+    let noScale = 1 << REF_SCALE_SHIFT;
     return Number(xScale != noScale || yScale != noScale);
   }
 
@@ -1773,8 +1666,8 @@ export class TileGroupObu {
         iai.AngleDeltaY = 0;
         iai.AngleDeltaUV = 0;
         fimi.use_filter_intra = 0;
-        fimi.use_filter_intra = reader.S("wedge_interintra");
-        if (fimi.use_filter_intra) {
+        rii.wedge_interintra = reader.S("wedge_interintra");
+        if (rii.wedge_interintra) {
           rii.wedge_index = reader.S("wedge_index");
           rct.wedge_sign = 0;
         }
@@ -1832,7 +1725,7 @@ export class TileGroupObu {
       }
     } else {
       if (rii.interintra) {
-        rct.compound_type = fimi.use_filter_intra ? COMPOUND_TYPE.COMPOUND_WEDGE : COMPOUND_TYPE.COMPOUND_INTRA;
+        rct.compound_type = rii.wedge_interintra ? COMPOUND_TYPE.COMPOUND_WEDGE : COMPOUND_TYPE.COMPOUND_INTRA;
       } else {
         rct.compound_type = COMPOUND_TYPE.COMPOUND_AVERAGE;
       }
@@ -1848,18 +1741,29 @@ export class TileGroupObu {
     const tg = this.titleGroup;
     const ifmi = tg.intra_frame_mode_info;
 
-    let compMode: Y_MODE | UV_MODE = Y_MODE.GLOBALMV;
+    let compMode = Y_MODE.GLOBALMV;
     if (refList == 0) {
-      if (ifmi.YMode < Y_MODE.NEAREST_NEARESTMV) compMode = ifmi.YMode;
-      else if (ifmi.YMode == Y_MODE.NEW_NEWMV || ifmi.YMode == Y_MODE.NEW_NEARESTMV || ifmi.YMode == Y_MODE.NEW_NEARMV) compMode = Y_MODE.NEWMV;
-      else if (ifmi.YMode == Y_MODE.NEAREST_NEARESTMV || ifmi.YMode == Y_MODE.NEAREST_NEWMV) compMode = Y_MODE.NEARESTMV;
-      else if (ifmi.YMode == Y_MODE.NEAR_NEARMV || ifmi.YMode == Y_MODE.NEAR_NEWMV) compMode = Y_MODE.NEARMV;
-      else compMode = Y_MODE.GLOBALMV;
+      if (ifmi.YMode < Y_MODE.NEAREST_NEARESTMV) {
+        compMode = ifmi.YMode;
+      } else if (ifmi.YMode == Y_MODE.NEW_NEWMV || ifmi.YMode == Y_MODE.NEW_NEARESTMV || ifmi.YMode == Y_MODE.NEW_NEARMV) {
+        compMode = Y_MODE.NEWMV;
+      } else if (ifmi.YMode == Y_MODE.NEAREST_NEARESTMV || ifmi.YMode == Y_MODE.NEAREST_NEWMV) {
+        compMode = Y_MODE.NEARESTMV;
+      } else if (ifmi.YMode == Y_MODE.NEAR_NEARMV || ifmi.YMode == Y_MODE.NEAR_NEWMV) {
+        compMode = Y_MODE.NEARMV;
+      } else {
+        compMode = Y_MODE.GLOBALMV;
+      }
     } else {
-      if (ifmi.YMode == Y_MODE.NEW_NEWMV || ifmi.YMode == Y_MODE.NEAREST_NEWMV || ifmi.YMode == Y_MODE.NEAR_NEWMV) compMode = Y_MODE.NEWMV;
-      else if (ifmi.YMode == Y_MODE.NEAREST_NEARESTMV || ifmi.YMode == Y_MODE.NEW_NEARESTMV) compMode = Y_MODE.NEARESTMV;
-      else if (ifmi.YMode == Y_MODE.NEAR_NEARMV || ifmi.YMode == Y_MODE.NEW_NEARMV) compMode = Y_MODE.NEARMV;
-      else compMode = Y_MODE.GLOBALMV;
+      if (ifmi.YMode == Y_MODE.NEW_NEWMV || ifmi.YMode == Y_MODE.NEAREST_NEWMV || ifmi.YMode == Y_MODE.NEAR_NEWMV) {
+        compMode = Y_MODE.NEWMV;
+      } else if (ifmi.YMode == Y_MODE.NEAREST_NEARESTMV || ifmi.YMode == Y_MODE.NEW_NEARESTMV) {
+        compMode = Y_MODE.NEARESTMV;
+      } else if (ifmi.YMode == Y_MODE.NEAR_NEARMV || ifmi.YMode == Y_MODE.NEW_NEARMV) {
+        compMode = Y_MODE.NEARMV;
+      } else {
+        compMode = Y_MODE.GLOBALMV;
+      }
     }
     return compMode;
   }
@@ -1877,7 +1781,7 @@ export class TileGroupObu {
 
     let diffMv = [0, 0];
     if (ifmi.use_intrabc) {
-      m.MvCtx = AV1.MV_INTRABC_CONTEXT;
+      m.MvCtx = MV_INTRABC_CONTEXT;
     } else {
       m.MvCtx = 0;
     }
@@ -1923,7 +1827,7 @@ export class TileGroupObu {
         let mv_bit = reader.S("mv_bit", { comp, i });
         d |= mv_bit << i;
       }
-      mag = AV1.CLASS0_SIZE << (mv_class + 2);
+      mag = CLASS0_SIZE << (mv_class + 2);
       let mv_fr = 3;
       if (!fh.force_integer_mv) {
         mv_fr = reader.S("mv_fr", { comp });
@@ -1960,24 +1864,24 @@ export class TileGroupObu {
       let planeSz = this.get_plane_residual_size(db.MiSize, plane);
       let num4x4W = Num_4x4_Blocks_Wide[planeSz];
       let num4x4H = Num_4x4_Blocks_High[planeSz];
-      let log2W = AV1.MI_SIZE_LOG2 + Mi_Width_Log2[planeSz];
-      let log2H = AV1.MI_SIZE_LOG2 + Mi_Height_Log2[planeSz];
+      let log2W = MI_SIZE_LOG2 + Mi_Width_Log2[planeSz];
+      let log2H = MI_SIZE_LOG2 + Mi_Height_Log2[planeSz];
       let subX = plane > 0 ? cc.subsampling_x : 0;
       let subY = plane > 0 ? cc.subsampling_y : 0;
-      let baseX = (db.MiCol >> subX) * AV1.MI_SIZE;
-      let baseY = (db.MiRow >> subY) * AV1.MI_SIZE;
+      let baseX = (db.MiCol >> subX) * MI_SIZE;
+      let baseY = (db.MiRow >> subY) * MI_SIZE;
       let candRow = (db.MiRow >> subY) << subY;
       let candCol = (db.MiCol >> subX) << subX;
 
       rii.IsInterIntra = Number(ii.is_inter && rf.RefFrame[1] == REF_FRAME.INTRA_FRAME);
       if (rii.IsInterIntra) {
-        let mode = UV_MODE.SMOOTH_PRED;
+        let mode = Y_MODE.SMOOTH_PRED;
         if (rii.interintra_mode == INTERINTRA_MODE.II_DC_PRED) {
-          mode = UV_MODE.DC_PRED;
+          mode = Y_MODE.DC_PRED;
         } else if (rii.interintra_mode == INTERINTRA_MODE.II_V_PRED) {
-          mode = UV_MODE.V_PRED;
+          mode = Y_MODE.V_PRED;
         } else if (rii.interintra_mode == INTERINTRA_MODE.II_H_PRED) {
-          mode = UV_MODE.H_PRED;
+          mode = Y_MODE.H_PRED;
         }
 
         p.predict_intra(
@@ -2055,13 +1959,13 @@ export class TileGroupObu {
           let num4x4H = Num_4x4_Blocks_High[planeSz];
           let subX = plane > 0 ? cc.subsampling_x : 0;
           let subY = plane > 0 ? cc.subsampling_y : 0;
-          let baseX = (miColChunk >> subX) * AV1.MI_SIZE;
-          let baseY = (miRowChunk >> subY) * AV1.MI_SIZE;
+          let baseX = (miColChunk >> subX) * MI_SIZE;
+          let baseY = (miRowChunk >> subY) * MI_SIZE;
           if (ii.is_inter && !isi.Lossless && !plane) {
             this.transform_tree(baseX, baseY, num4x4W * 4, num4x4H * 4);
           } else {
-            let baseXBlock = (db.MiCol >> subX) * AV1.MI_SIZE;
-            let baseYBlock = (db.MiRow >> subY) * AV1.MI_SIZE;
+            let baseXBlock = (db.MiCol >> subX) * MI_SIZE;
+            let baseYBlock = (db.MiRow >> subY) * MI_SIZE;
             for (let y = 0; y < num4x4H; y += stepY)
               for (let x = 0; x < num4x4W; x += stepX) {
                 this.transform_block(plane, baseXBlock, baseYBlock, txSz, x + ((chunkX << 4) >>> subX), y + ((chunkY << 4) >>> subY));
@@ -2097,15 +2001,15 @@ export class TileGroupObu {
     let startY = baseY + 4 * y;
     let subX = plane > 0 ? cc.subsampling_x : 0;
     let subY = plane > 0 ? cc.subsampling_y : 0;
-    let row = (startY << subY) >> AV1.MI_SIZE_LOG2;
-    let col = (startX << subX) >> AV1.MI_SIZE_LOG2;
+    let row = (startY << subY) >> MI_SIZE_LOG2;
+    let col = (startX << subX) >> MI_SIZE_LOG2;
     let sbMask = seqHeader.use_128x128_superblock ? 31 : 15;
     let subBlockMiRow = row & sbMask;
     let subBlockMiCol = col & sbMask;
-    let stepX = Tx_Width[txSz] >> AV1.MI_SIZE_LOG2;
-    let stepY = Tx_Height[txSz] >> AV1.MI_SIZE_LOG2;
-    let maxX = (cis.MiCols * AV1.MI_SIZE) >> subX;
-    let maxY = (cis.MiRows * AV1.MI_SIZE) >> subY;
+    let stepX = Tx_Width[txSz] >> MI_SIZE_LOG2;
+    let stepY = Tx_Height[txSz] >> MI_SIZE_LOG2;
+    let maxX = (cis.MiCols * MI_SIZE) >> subX;
+    let maxY = (cis.MiRows * MI_SIZE) >> subY;
     if (startX >= maxX || startY >= maxY) {
       return;
     }
@@ -2113,12 +2017,12 @@ export class TileGroupObu {
       if ((plane == 0 && pmi.PaletteSizeY) || (plane != 0 && pmi.PaletteSizeUV)) {
         p.predict_palette(plane, startX, startY, x, y, txSz);
       } else {
-        let isCfl = plane > 0 && ifmi.UVMode == UV_MODE.UV_CFL_PRED;
-        let mode;
+        let isCfl = plane > 0 && ifmi.UVMode == Y_MODE.UV_CFL_PRED;
+        let mode: Y_MODE;
         if (plane == 0) {
           mode = ifmi.YMode;
         } else {
-          mode = isCfl ? UV_MODE.DC_PRED : ifmi.UVMode;
+          mode = isCfl ? Y_MODE.DC_PRED : ifmi.UVMode;
         }
         let log2W = Tx_Width_Log2[txSz];
         let log2H = Tx_Height_Log2[txSz];
@@ -2143,6 +2047,18 @@ export class TileGroupObu {
         tb.MaxLumaH = startY + stepY * 4;
       }
     }
+    if (this.decoder.obu.onPredFrame) {
+      let w = 1 << Tx_Width_Log2[txSz];
+      let h = 1 << Tx_Height_Log2[txSz];
+      let pred: number[][] = Array2D(h);
+      for (let i = 0; i < h; i++) {
+        for (let j = 0; j < w; j++) {
+          pred[i][j] = p.CurrFrame[plane][startY + i][startX + j];
+        }
+      }
+      this.decoder.obu.onPredFrame(plane, startX, startY, pred);
+    }
+
     if (!s.skip) {
       let eob = this.coeffs(plane, startX, startY, txSz);
       if (eob > 0) {
@@ -2150,29 +2066,18 @@ export class TileGroupObu {
       }
     }
 
-    /**
-     * @debug frame
-     */
-    if (!s.skip) {
+    if (this.decoder.obu.onResidualFrame) {
       let log2W = Tx_Width_Log2[txSz];
       let log2H = Tx_Height_Log2[txSz];
       let w = 1 << log2W;
       let h = 1 << log2H;
-      let frameLog = "{";
+      const frame = Array2D(h);
       for (let i = 0; i < h; i++) {
-        frameLog += "{";
         for (let j = 0; j < w; j++) {
-          frameLog += p.CurrFrame[plane][startY + i][startX + j] + ",";
+          frame[i][j] = p.CurrFrame[plane][startY + i][startX + j];
         }
-        frameLog = frameLog.slice(0, -1);
-        frameLog += "},";
       }
-      frameLog = frameLog.slice(0, -1);
-      frameLog += "},";
-      debugCurrent++;
-      if (debugCurrent == 2771) {
-        debugCurrent = 2771;
-      }
+      this.decoder.obu.onResidualFrame(plane, startX, startY, frame);
     }
 
     for (let i = 0; i < stepY; i++) {
@@ -2194,13 +2099,13 @@ export class TileGroupObu {
     const tg = this.titleGroup;
     const bts = tg.block_tx_size;
 
-    let maxX = cis.MiCols * AV1.MI_SIZE;
-    let maxY = cis.MiRows * AV1.MI_SIZE;
+    let maxX = cis.MiCols * MI_SIZE;
+    let maxY = cis.MiRows * MI_SIZE;
     if (startX >= maxX || startY >= maxY) {
       return;
     }
-    let row = startY >> AV1.MI_SIZE_LOG2;
-    let col = startX >> AV1.MI_SIZE_LOG2;
+    let row = startY >> MI_SIZE_LOG2;
+    let col = startX >> MI_SIZE_LOG2;
     let lumaTxSz = bts.InterTxSizes[row][col];
     let lumaW = Tx_Width[lumaTxSz];
     let lumaH = Tx_Height[lumaTxSz];
@@ -2230,7 +2135,7 @@ export class TileGroupObu {
    */
   find_tx_size(w: number, h: number) {
     let txSz = 0;
-    for (txSz = 0; txSz < AV1.TX_SIZES_ALL; txSz++) if (Tx_Width[txSz] == w && Tx_Height[txSz] == h) break;
+    for (txSz = 0; txSz < TX_SIZES_ALL; txSz++) if (Tx_Width[txSz] == w && Tx_Height[txSz] == h) break;
     return txSz;
   }
 
@@ -2239,7 +2144,7 @@ export class TileGroupObu {
    *
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#get-tx-size-function)
    */
-  get_tx_size(plane: number, txSz: number) {
+  get_tx_size(plane: number, txSz: TX_SIZE) {
     const tg = this.titleGroup;
     const db = tg.decode_block;
 
@@ -2305,7 +2210,7 @@ export class TileGroupObu {
       if (plane == 0) {
         for (let i = 0; i < w4; i++) {
           for (let j = 0; j < h4; j++) {
-            coef.TxTypes[y4 + j][x4 + i] = AV1.DCT_DCT;
+            coef.TxTypes[y4 + j][x4 + i] = DCT_DCT;
           }
         }
       }
@@ -2364,11 +2269,11 @@ export class TileGroupObu {
           let coeff_base = reader.S("coeff_base", { txSz, plane, x4, y4, c, scan, txSzCtx, ptype });
           level = coeff_base;
         }
-        if (level > AV1.NUM_BASE_LEVELS) {
-          for (let idx = 0; idx < AV1.COEFF_BASE_RANGE / (AV1.BR_CDF_SIZE - 1); idx++) {
+        if (level > NUM_BASE_LEVELS) {
+          for (let idx = 0; idx < COEFF_BASE_RANGE / (BR_CDF_SIZE - 1); idx++) {
             let coeff_br = reader.S("coeff_br", { txSz, pos, plane, x4, y4, txSzCtx, ptype });
             level += coeff_br;
-            if (coeff_br < AV1.BR_CDF_SIZE - 1) break;
+            if (coeff_br < BR_CDF_SIZE - 1) break;
           }
         }
         coef.Quant[pos] = level;
@@ -2385,7 +2290,7 @@ export class TileGroupObu {
             sign = sign_bit;
           }
         }
-        if (coef.Quant[pos] > AV1.NUM_BASE_LEVELS + AV1.COEFF_BASE_RANGE) {
+        if (coef.Quant[pos] > NUM_BASE_LEVELS + COEFF_BASE_RANGE) {
           let length = 0;
           let golomb_length_bit: number;
           do {
@@ -2400,7 +2305,7 @@ export class TileGroupObu {
             let golomb_data_bit = reader.L(1);
             x = (x << 1) | golomb_data_bit;
           }
-          coef.Quant[pos] = x + AV1.COEFF_BASE_RANGE + AV1.NUM_BASE_LEVELS;
+          coef.Quant[pos] = x + COEFF_BASE_RANGE + NUM_BASE_LEVELS;
         }
         if (pos == 0 && coef.Quant[pos] > 0) {
           dcCategory = sign ? 1 : 2;
@@ -2438,7 +2343,7 @@ export class TileGroupObu {
     const coef = tg.coefficients;
 
     let txSzSqrUp = Tx_Size_Sqr_Up[txSz];
-    if (isi.Lossless || txSzSqrUp > TX_SIZE.TX_32X32) return AV1.DCT_DCT;
+    if (isi.Lossless || txSzSqrUp > TX_SIZE.TX_32X32) return DCT_DCT;
     let txSet = this.get_tx_set(txSz);
     if (plane == 0) {
       return coef.TxTypes[blockY][blockX];
@@ -2447,11 +2352,11 @@ export class TileGroupObu {
       let x4 = Math.max(db.MiCol, blockX << cc.subsampling_x);
       let y4 = Math.max(db.MiRow, blockY << cc.subsampling_y);
       let txType = coef.TxTypes[y4][x4];
-      if (!this.is_tx_type_in_set(txSet, txType)) return AV1.DCT_DCT;
+      if (!this.is_tx_type_in_set(txSet, txType)) return DCT_DCT;
       return txType;
     }
     let txType = Mode_To_Txfm[ifmi.UVMode];
-    if (!this.is_tx_type_in_set(txSet, txType)) return AV1.DCT_DCT;
+    if (!this.is_tx_type_in_set(txSet, txType)) return DCT_DCT;
     return txType;
   }
 
@@ -2574,11 +2479,11 @@ export class TileGroupObu {
     if (Tx_Size_Sqr_Up[txSz] == TX_SIZE.TX_64X64) {
       return Default_Scan_32x32;
     }
-    if (coef.PlaneTxType == AV1.IDTX) {
+    if (coef.PlaneTxType == IDTX) {
       return this.get_default_scan(txSz);
     }
-    let preferRow = coef.PlaneTxType == AV1.V_DCT || coef.PlaneTxType == AV1.V_ADST || coef.PlaneTxType == AV1.V_FLIPADST;
-    let preferCol = coef.PlaneTxType == AV1.H_DCT || coef.PlaneTxType == AV1.H_ADST || coef.PlaneTxType == AV1.H_FLIPADST;
+    let preferRow = coef.PlaneTxType == V_DCT || coef.PlaneTxType == V_ADST || coef.PlaneTxType == V_FLIPADST;
+    let preferCol = coef.PlaneTxType == H_DCT || coef.PlaneTxType == H_ADST || coef.PlaneTxType == H_FLIPADST;
     if (preferRow) {
       return this.get_mrow_scan(txSz);
     } else if (preferCol) {
@@ -2603,7 +2508,7 @@ export class TileGroupObu {
     if (db.MiSize >= SUB_SIZE.BLOCK_8X8) {
       if (this.is_directional_mode(ifmi.YMode)) {
         let angle_delta_y = reader.S("angle_delta_y");
-        iai.AngleDeltaY = angle_delta_y - AV1.MAX_ANGLE_DELTA;
+        iai.AngleDeltaY = angle_delta_y - MAX_ANGLE_DELTA;
       }
     }
   }
@@ -2624,7 +2529,7 @@ export class TileGroupObu {
     if (db.MiSize >= SUB_SIZE.BLOCK_8X8) {
       if (this.is_directional_mode(ifmi.UVMode)) {
         let angle_delta_uv = reader.S("angle_delta_uv");
-        iai.AngleDeltaUV = angle_delta_uv - AV1.MAX_ANGLE_DELTA;
+        iai.AngleDeltaUV = angle_delta_uv - MAX_ANGLE_DELTA;
       }
     }
   }
@@ -2634,8 +2539,8 @@ export class TileGroupObu {
    *
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#is-directional-mode-function)
    */
-  is_directional_mode(mode: UV_MODE | Y_MODE) {
-    if (mode >= UV_MODE.V_PRED && mode <= UV_MODE.D67_PRED) {
+  is_directional_mode(mode: Y_MODE) {
+    if (mode >= Y_MODE.V_PRED && mode <= Y_MODE.D67_PRED) {
       return 1;
     }
     return 0;
@@ -2709,7 +2614,7 @@ export class TileGroupObu {
     const pmi = tg.palette_mode_info;
 
     let bsizeCtx = Mi_Width_Log2[db.MiSize] + Mi_Height_Log2[db.MiSize] - 2;
-    if (ifmi.YMode == UV_MODE.DC_PRED) {
+    if (ifmi.YMode == Y_MODE.DC_PRED) {
       let has_palette_y = reader.S("has_palette_y", { bsizeCtx });
       if (has_palette_y) {
         let palette_size_y_minus_2 = reader.S("palette_size_y_minus_2", { bsizeCtx });
@@ -2744,7 +2649,7 @@ export class TileGroupObu {
         this.sort(pmi.palette_colors_y, 0, pmi.PaletteSizeY - 1);
       }
     }
-    if (db.HasChroma && ifmi.UVMode == UV_MODE.DC_PRED) {
+    if (db.HasChroma && ifmi.UVMode == Y_MODE.DC_PRED) {
       let has_palette_uv = reader.S("has_palette_uv");
       if (has_palette_uv) {
         let palette_size_uv_minus_2 = reader.S("palette_size_uv_minus_2", { bsizeCtx });
@@ -2829,7 +2734,7 @@ export class TileGroupObu {
     const db = tg.decode_block;
 
     let aboveN = 0;
-    if ((db.MiRow * AV1.MI_SIZE) % 64) {
+    if ((db.MiRow * MI_SIZE) % 64) {
       aboveN = db.PaletteSizes[plane][db.MiRow - 1][db.MiCol];
     }
     let leftN = 0;
@@ -2914,7 +2819,7 @@ export class TileGroupObu {
         }
       }
     } else {
-      coef.TxType = AV1.DCT_DCT;
+      coef.TxType = DCT_DCT;
     }
     for (let i = 0; i < Tx_Width[txSz] >> 2; i++) {
       for (let j = 0; j < Tx_Height[txSz] >> 2; j++) {
@@ -2967,8 +2872,8 @@ export class TileGroupObu {
 
     let blockHeight = Block_Height[db.MiSize];
     let blockWidth = Block_Width[db.MiSize];
-    let onscreenHeight = Math.min(blockHeight, (cis.MiRows - db.MiRow) * AV1.MI_SIZE);
-    let onscreenWidth = Math.min(blockWidth, (cis.MiCols - db.MiCol) * AV1.MI_SIZE);
+    let onscreenHeight = Math.min(blockHeight, (cis.MiRows - db.MiRow) * MI_SIZE);
+    let onscreenWidth = Math.min(blockWidth, (cis.MiCols - db.MiCol) * MI_SIZE);
     if (pmi.PaletteSizeY) {
       let color_index_map_y = reader.NS(pmi.PaletteSizeY);
       pt.ColorMapY[0][0] = color_index_map_y;
@@ -3035,7 +2940,7 @@ export class TileGroupObu {
     const pcc = tg.palette_color_context;
 
     let scores: number[] = [];
-    for (let i = 0; i < AV1.PALETTE_COLORS; i++) {
+    for (let i = 0; i < PALETTE_COLORS; i++) {
       scores[i] = 0;
       pcc.ColorOrder[i] = i;
     }
@@ -3052,7 +2957,7 @@ export class TileGroupObu {
       neighbor = colorMap[r - 1][c];
       scores[neighbor] += 2;
     }
-    for (let i = 0; i < AV1.PALETTE_NUM_NEIGHBORS; i++) {
+    for (let i = 0; i < PALETTE_NUM_NEIGHBORS; i++) {
       let maxScore = scores[i];
       let maxIdx = i;
       for (let j = i + 1; j < n; j++) {
@@ -3073,7 +2978,7 @@ export class TileGroupObu {
       }
     }
     pcc.ColorContextHash = 0;
-    for (let i = 0; i < AV1.PALETTE_NUM_NEIGHBORS; i++) {
+    for (let i = 0; i < PALETTE_NUM_NEIGHBORS; i++) {
       pcc.ColorContextHash += scores[i] * Palette_Color_Hash_Multipliers[i];
     }
   }
@@ -3117,8 +3022,8 @@ export class TileGroupObu {
     const db = tg.decode_block;
 
     let bh4 = Num_4x4_Blocks_High[db.MiSize];
-    let mbToTopEdge = -(db.MiRow * AV1.MI_SIZE * 8);
-    let mbToBottomEdge = (cis.MiRows - bh4 - db.MiRow) * AV1.MI_SIZE * 8;
+    let mbToTopEdge = -(db.MiRow * MI_SIZE * 8);
+    let mbToBottomEdge = (cis.MiRows - bh4 - db.MiRow) * MI_SIZE * 8;
     return Clip3(mbToTopEdge - border, mbToBottomEdge + border, mvec);
   }
 
@@ -3134,8 +3039,8 @@ export class TileGroupObu {
     const db = tg.decode_block;
 
     let bw4 = Num_4x4_Blocks_Wide[db.MiSize];
-    let mbToLeftEdge = -(db.MiCol * AV1.MI_SIZE * 8);
-    let mbToRightEdge = (cis.MiCols - bw4 - db.MiCol) * AV1.MI_SIZE * 8;
+    let mbToLeftEdge = -(db.MiCol * MI_SIZE * 8);
+    let mbToRightEdge = (cis.MiCols - bw4 - db.MiCol) * MI_SIZE * 8;
     return Clip3(mbToLeftEdge - border, mbToRightEdge + border, mvec);
   }
 
@@ -3220,15 +3125,15 @@ export class TileGroupObu {
 
         let unitRows = this.count_units_in_frame(unitSize, Round2(fs.FrameHeight, subY));
         let unitCols = this.count_units_in_frame(unitSize, Round2(fswr.UpscaledWidth, subX));
-        let unitRowStart = integer((r * (AV1.MI_SIZE >>> subY) + unitSize - 1) / unitSize);
-        let unitRowEnd = Math.min(unitRows, integer(((r + h) * (AV1.MI_SIZE >>> subY) + unitSize - 1) / unitSize));
+        let unitRowStart = integer((r * (MI_SIZE >>> subY) + unitSize - 1) / unitSize);
+        let unitRowEnd = Math.min(unitRows, integer(((r + h) * (MI_SIZE >>> subY) + unitSize - 1) / unitSize));
         let numerator = 0;
         let denominator = 0;
         if (sp.use_superres) {
-          numerator = (AV1.MI_SIZE >>> subX) * sp.SuperresDenom;
-          denominator = unitSize * AV1.SUPERRES_NUM;
+          numerator = (MI_SIZE >>> subX) * sp.SuperresDenom;
+          denominator = unitSize * SUPERRES_NUM;
         } else {
-          numerator = AV1.MI_SIZE >>> subX;
+          numerator = MI_SIZE >>> subX;
           denominator = unitSize;
         }
         let unitColStart = integer((c * numerator + denominator - 1) / denominator);
@@ -3292,7 +3197,7 @@ export class TileGroupObu {
         }
       }
     } else if (restoration_type == FRAME_RESTORATION_TYPE.RESTORE_SGRPROJ) {
-      let lr_sgr_set = reader.L(AV1.SGRPROJ_PARAMS_BITS);
+      let lr_sgr_set = reader.L(SGRPROJ_PARAMS_BITS);
       lp.LrSgrSet[plane][unitRow][unitCol] = lr_sgr_set;
       for (let i = 0; i < 2; i++) {
         let radius = Sgr_Params[lr_sgr_set][i * 2];
@@ -3300,11 +3205,11 @@ export class TileGroupObu {
         let max = Sgrproj_Xqd_Max[i];
         let v = 0;
         if (radius) {
-          v = this.decode_signed_subexp_with_ref_bool(min, max + 1, AV1.SGRPROJ_PRJ_SUBEXP_K, dt.RefSgrXqd[plane][i]);
+          v = this.decode_signed_subexp_with_ref_bool(min, max + 1, SGRPROJ_PRJ_SUBEXP_K, dt.RefSgrXqd[plane][i]);
         } else {
           v = 0;
           if (i == 1) {
-            v = Clip3(min, max, (1 << AV1.SGRPROJ_PRJ_BITS) - dt.RefSgrXqd[plane][0]);
+            v = Clip3(min, max, (1 << SGRPROJ_PRJ_BITS) - dt.RefSgrXqd[plane][0]);
           }
         }
         lp.LrSgrXqd[plane][unitRow][unitCol][i] = v;
@@ -3438,37 +3343,32 @@ export class TileGroupObu {
     }
     let deltaRow = m.Mv[0][0] >> 3;
     let deltaCol = m.Mv[0][1] >> 3;
-    let srcTopEdge = db.MiRow * AV1.MI_SIZE + deltaRow;
-    let srcLeftEdge = db.MiCol * AV1.MI_SIZE + deltaCol;
+    let srcTopEdge = db.MiRow * MI_SIZE + deltaRow;
+    let srcLeftEdge = db.MiCol * MI_SIZE + deltaCol;
     let srcBottomEdge = srcTopEdge + bh;
     let srcRightEdge = srcLeftEdge + bw;
     if (db.HasChroma) {
       if (bw < 8 && cc.subsampling_x) srcLeftEdge -= 4;
       if (bh < 8 && cc.subsampling_y) srcTopEdge -= 4;
     }
-    if (
-      srcTopEdge < tg.MiRowStart * AV1.MI_SIZE ||
-      srcLeftEdge < tg.MiColStart * AV1.MI_SIZE ||
-      srcBottomEdge > tg.MiRowEnd * AV1.MI_SIZE ||
-      srcRightEdge > tg.MiColEnd * AV1.MI_SIZE
-    ) {
+    if (srcTopEdge < tg.MiRowStart * MI_SIZE || srcLeftEdge < tg.MiColStart * MI_SIZE || srcBottomEdge > tg.MiRowEnd * MI_SIZE || srcRightEdge > tg.MiColEnd * MI_SIZE) {
       return 0;
     }
     let sbSize = seqHeader.use_128x128_superblock ? SUB_SIZE.BLOCK_128X128 : SUB_SIZE.BLOCK_64X64;
     let sbH = Block_Height[sbSize];
-    let activeSbRow = integer((db.MiRow * AV1.MI_SIZE) / sbH);
-    let activeSb64Col = (db.MiCol * AV1.MI_SIZE) >> 6;
+    let activeSbRow = integer((db.MiRow * MI_SIZE) / sbH);
+    let activeSb64Col = (db.MiCol * MI_SIZE) >> 6;
     let srcSbRow = integer((srcBottomEdge - 1) / sbH);
     let srcSb64Col = (srcRightEdge - 1) >> 6;
     let totalSb64PerRow = ((tg.MiColEnd - tg.MiColStart - 1) >> 4) + 1;
     let activeSb64 = activeSbRow * totalSb64PerRow + activeSb64Col;
     let srcSb64 = srcSbRow * totalSb64PerRow + srcSb64Col;
-    if (srcSb64 >= activeSb64 - AV1.INTRABC_DELAY_SB64) {
+    if (srcSb64 >= activeSb64 - INTRABC_DELAY_SB64) {
       return 0;
     }
-    let gradient = 1 + AV1.INTRABC_DELAY_SB64 + seqHeader.use_128x128_superblock;
+    let gradient = 1 + INTRABC_DELAY_SB64 + seqHeader.use_128x128_superblock;
     let wfOffset = gradient * (activeSbRow - srcSbRow);
-    if (srcSbRow > activeSbRow || srcSb64Col >= activeSb64Col - AV1.INTRABC_DELAY_SB64 + wfOffset) {
+    if (srcSbRow > activeSbRow || srcSb64Col >= activeSb64Col - INTRABC_DELAY_SB64 + wfOffset) {
       return 0;
     }
     return 1;
@@ -3565,10 +3465,10 @@ interface TileGroup {
    */
   intra_frame_mode_info: {
     use_intrabc: number;
-    intra_frame_y_mode: UV_MODE;
-    uv_mode: UV_MODE;
-    YMode: UV_MODE | Y_MODE;
-    UVMode: UV_MODE;
+    intra_frame_y_mode: Y_MODE;
+    uv_mode: Y_MODE;
+    YMode: Y_MODE;
+    UVMode: Y_MODE;
     LeftRefFrame: number[];
     AboveRefFrame: number[];
     LeftIntra: boolean;
@@ -3708,6 +3608,13 @@ interface TileGroup {
    */
   ref_frames: {
     RefFrame: REF_FRAME[];
+
+    /**
+     * Flags for bitstream consistency requirements
+     *
+     * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#ref-frames-semantics)
+     */
+    conformance?: boolean;
   };
 
   /**
@@ -3846,3 +3753,135 @@ interface TileGroup {
     cdef_idx: number[][];
   };
 }
+
+const Subsampled_Size = [
+  [
+    [SUB_SIZE.BLOCK_4X4, SUB_SIZE.BLOCK_4X4],
+    [SUB_SIZE.BLOCK_4X4, SUB_SIZE.BLOCK_4X4],
+  ],
+  [
+    [SUB_SIZE.BLOCK_4X8, SUB_SIZE.BLOCK_4X4],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_4X4],
+  ],
+  [
+    [SUB_SIZE.BLOCK_8X4, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_4X4, SUB_SIZE.BLOCK_4X4],
+  ],
+  [
+    [SUB_SIZE.BLOCK_8X8, SUB_SIZE.BLOCK_8X4],
+    [SUB_SIZE.BLOCK_4X8, SUB_SIZE.BLOCK_4X4],
+  ],
+  [
+    [SUB_SIZE.BLOCK_8X16, SUB_SIZE.BLOCK_8X8],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_4X8],
+  ],
+  [
+    [SUB_SIZE.BLOCK_16X8, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_8X8, SUB_SIZE.BLOCK_8X4],
+  ],
+  [
+    [SUB_SIZE.BLOCK_16X16, SUB_SIZE.BLOCK_16X8],
+    [SUB_SIZE.BLOCK_8X16, SUB_SIZE.BLOCK_8X8],
+  ],
+  [
+    [SUB_SIZE.BLOCK_16X32, SUB_SIZE.BLOCK_16X16],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_8X16],
+  ],
+  [
+    [SUB_SIZE.BLOCK_32X16, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_16X16, SUB_SIZE.BLOCK_16X8],
+  ],
+  [
+    [SUB_SIZE.BLOCK_32X32, SUB_SIZE.BLOCK_32X16],
+    [SUB_SIZE.BLOCK_16X32, SUB_SIZE.BLOCK_16X16],
+  ],
+  [
+    [SUB_SIZE.BLOCK_32X64, SUB_SIZE.BLOCK_32X32],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_16X32],
+  ],
+  [
+    [SUB_SIZE.BLOCK_64X32, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_32X32, SUB_SIZE.BLOCK_32X16],
+  ],
+  [
+    [SUB_SIZE.BLOCK_64X64, SUB_SIZE.BLOCK_64X32],
+    [SUB_SIZE.BLOCK_32X64, SUB_SIZE.BLOCK_32X32],
+  ],
+  [
+    [SUB_SIZE.BLOCK_64X128, SUB_SIZE.BLOCK_64X64],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_32X64],
+  ],
+  [
+    [SUB_SIZE.BLOCK_128X64, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_64X64, SUB_SIZE.BLOCK_64X32],
+  ],
+  [
+    [SUB_SIZE.BLOCK_128X128, SUB_SIZE.BLOCK_128X64],
+    [SUB_SIZE.BLOCK_64X128, SUB_SIZE.BLOCK_64X64],
+  ],
+  [
+    [SUB_SIZE.BLOCK_4X16, SUB_SIZE.BLOCK_4X8],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_4X8],
+  ],
+  [
+    [SUB_SIZE.BLOCK_16X4, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_8X4, SUB_SIZE.BLOCK_8X4],
+  ],
+  [
+    [SUB_SIZE.BLOCK_8X32, SUB_SIZE.BLOCK_8X16],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_4X16],
+  ],
+  [
+    [SUB_SIZE.BLOCK_32X8, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_16X8, SUB_SIZE.BLOCK_16X4],
+  ],
+  [
+    [SUB_SIZE.BLOCK_16X64, SUB_SIZE.BLOCK_16X32],
+    [SUB_SIZE.BLOCK_INVALID, SUB_SIZE.BLOCK_8X32],
+  ],
+  [
+    [SUB_SIZE.BLOCK_64X16, SUB_SIZE.BLOCK_INVALID],
+    [SUB_SIZE.BLOCK_32X16, SUB_SIZE.BLOCK_32X8],
+  ],
+];
+
+const Tx_Type_In_Set_Intra = [
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+  [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+];
+const Tx_Type_In_Set_Inter = [
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+];
+
+const Tx_Type_Intra_Inv_Set1 = [IDTX, DCT_DCT, V_DCT, H_DCT, ADST_ADST, ADST_DCT, DCT_ADST];
+const Tx_Type_Intra_Inv_Set2 = [IDTX, DCT_DCT, ADST_ADST, ADST_DCT, DCT_ADST];
+const Tx_Type_Inter_Inv_Set1 = [
+  IDTX,
+  V_DCT,
+  H_DCT,
+  V_ADST,
+  H_ADST,
+  V_FLIPADST,
+  H_FLIPADST,
+  DCT_DCT,
+  ADST_DCT,
+  DCT_ADST,
+  FLIPADST_DCT,
+  DCT_FLIPADST,
+  ADST_ADST,
+  FLIPADST_FLIPADST,
+  ADST_FLIPADST,
+  FLIPADST_ADST,
+];
+const Tx_Type_Inter_Inv_Set2 = [IDTX, V_DCT, H_DCT, DCT_DCT, ADST_DCT, DCT_ADST, FLIPADST_DCT, DCT_FLIPADST, ADST_ADST, FLIPADST_FLIPADST, ADST_FLIPADST, FLIPADST_ADST];
+const Tx_Type_Inter_Inv_Set3 = [IDTX, DCT_DCT];
+
+const Wiener_Taps_Min = [-5, -23, -17];
+const Wiener_Taps_Max = [10, 8, 46];
+const Wiener_Taps_K = [1, 2, 3];
+const Sgrproj_Xqd_Min = [-96, -32];
+const Sgrproj_Xqd_Max = [31, 95];

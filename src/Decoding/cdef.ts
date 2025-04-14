@@ -1,65 +1,10 @@
 import { Array2D, Clip3, FloorLog2, integer } from "../Conventions";
-import * as AV1 from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { SUB_SIZE } from "../SyntaxStructures/Semantics";
 
 import { Num_4x4_Blocks_Wide } from "../AdditionalTables/ConversionTables";
-
-const Cdef_Uv_Dir = [
-  [
-    [0, 1, 2, 3, 4, 5, 6, 7],
-    [1, 2, 2, 2, 3, 4, 6, 0],
-  ],
-  [
-    [7, 0, 2, 4, 5, 6, 6, 6],
-    [0, 1, 2, 3, 4, 5, 6, 7],
-  ],
-];
-
-const Cdef_Directions = [
-  [
-    [-1, 1],
-    [-2, 2],
-  ],
-  [
-    [0, 1],
-    [-1, 2],
-  ],
-  [
-    [0, 1],
-    [0, 2],
-  ],
-  [
-    [0, 1],
-    [1, 2],
-  ],
-  [
-    [1, 1],
-    [2, 2],
-  ],
-  [
-    [1, 0],
-    [2, 1],
-  ],
-  [
-    [1, 0],
-    [2, 0],
-  ],
-  [
-    [1, 0],
-    [2, -1],
-  ],
-];
-
-const Cdef_Pri_Taps = [
-  [4, 2],
-  [3, 3],
-];
-const Cdef_Sec_Taps = [
-  [2, 1],
-  [2, 1],
-];
+import { MI_SIZE, MI_SIZE_LOG2 } from "../define";
 
 /**
  * 7.15 CDEF process
@@ -112,10 +57,10 @@ export class CDEF {
     const dfw = this.decoder.decodeFrameWrapup;
     const p = this.decoder.prediction;
 
-    let startY = r * AV1.MI_SIZE;
-    let endY = startY + AV1.MI_SIZE * 2;
-    let startX = c * AV1.MI_SIZE;
-    let endX = startX + AV1.MI_SIZE * 2;
+    let startY = r * MI_SIZE;
+    let endY = startY + MI_SIZE * 2;
+    let startX = c * MI_SIZE;
+    let endX = startX + MI_SIZE * 2;
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
         dfw.CdefFrame[0][y][x] = p.CurrFrame[0][y][x];
@@ -197,8 +142,8 @@ export class CDEF {
     }
     let bestCost = 0;
     let yDir = 0;
-    let x0 = c << AV1.MI_SIZE_LOG2;
-    let y0 = r << AV1.MI_SIZE_LOG2;
+    let x0 = c << MI_SIZE_LOG2;
+    let y0 = r << MI_SIZE_LOG2;
     for (let i = 0; i < 8; i++) {
       for (let j = 0; j < 8; j++) {
         let x = (p.CurrFrame[0][y0 + i][x0 + j] >> (cc.BitDepth - 8)) - 128;
@@ -244,7 +189,7 @@ export class CDEF {
   }
 
   /**
-   * 7.15.2 7.15.3 CDEF filter process
+   * 7.15.3 CDEF filter process
    *
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#cdef-filter-process)
    */
@@ -260,8 +205,8 @@ export class CDEF {
 
     let subX = plane > 0 ? cc.subsampling_x : 0;
     let subY = plane > 0 ? cc.subsampling_y : 0;
-    let x0 = (c * AV1.MI_SIZE) >> subX;
-    let y0 = (r * AV1.MI_SIZE) >> subY;
+    let x0 = (c * MI_SIZE) >> subX;
+    let y0 = (r * MI_SIZE) >> subY;
     let w = 8 >> subX;
     let h = 8 >> subY;
     for (let i = 0; i < h; i++) {
@@ -315,8 +260,8 @@ export class CDEF {
 
     let y = y0 + i + sign * Cdef_Directions[dir][k][0];
     let x = x0 + j + sign * Cdef_Directions[dir][k][1];
-    let candidateR = (y << subY) >> AV1.MI_SIZE_LOG2;
-    let candidateC = (x << subX) >> AV1.MI_SIZE_LOG2;
+    let candidateR = (y << subY) >> MI_SIZE_LOG2;
+    let candidateC = (x << subX) >> MI_SIZE_LOG2;
     if (this.decoder.tileGroupObu.is_inside_filter_region(candidateR, candidateC)) {
       this.CdefAvailable = 1;
       return p.CurrFrame[plane][y][x];
@@ -326,3 +271,58 @@ export class CDEF {
     }
   }
 }
+
+const Cdef_Uv_Dir = [
+  [
+    [0, 1, 2, 3, 4, 5, 6, 7],
+    [1, 2, 2, 2, 3, 4, 6, 0],
+  ],
+  [
+    [7, 0, 2, 4, 5, 6, 6, 6],
+    [0, 1, 2, 3, 4, 5, 6, 7],
+  ],
+];
+
+const Cdef_Directions = [
+  [
+    [-1, 1],
+    [-2, 2],
+  ],
+  [
+    [0, 1],
+    [-1, 2],
+  ],
+  [
+    [0, 1],
+    [0, 2],
+  ],
+  [
+    [0, 1],
+    [1, 2],
+  ],
+  [
+    [1, 1],
+    [2, 2],
+  ],
+  [
+    [1, 0],
+    [2, 1],
+  ],
+  [
+    [1, 0],
+    [2, 0],
+  ],
+  [
+    [1, 0],
+    [2, -1],
+  ],
+];
+
+const Cdef_Pri_Taps = [
+  [4, 2],
+  [3, 3],
+];
+const Cdef_Sec_Taps = [
+  [2, 1],
+  [2, 1],
+];

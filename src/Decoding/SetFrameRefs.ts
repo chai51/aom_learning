@@ -1,4 +1,4 @@
-import * as AV1 from "../define";
+import { NUM_REF_FRAMES, REFS_PER_FRAME } from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { REF_FRAME } from "../SyntaxStructures/Semantics";
@@ -28,14 +28,14 @@ export class SetFrameRefs {
     const fh = fho.frameHeader;
 
     const Ref_Frame_List = [REF_FRAME.LAST2_FRAME, REF_FRAME.LAST3_FRAME, REF_FRAME.BWDREF_FRAME, REF_FRAME.ALTREF2_FRAME, REF_FRAME.ALTREF_FRAME];
-    for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+    for (let i = 0; i < REFS_PER_FRAME; i++) {
       fh.ref_frame_idx[i] = -1;
     }
     fh.ref_frame_idx[REF_FRAME.LAST_FRAME - REF_FRAME.LAST_FRAME] = fh.last_frame_idx;
     fh.ref_frame_idx[REF_FRAME.GOLDEN_FRAME - REF_FRAME.LAST_FRAME] = fh.gold_frame_idx;
 
     let usedFrame: number[] = [];
-    for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+    for (let i = 0; i < NUM_REF_FRAMES; i++) {
       usedFrame[i] = 0;
     }
     usedFrame[fh.last_frame_idx] = 1;
@@ -43,7 +43,7 @@ export class SetFrameRefs {
 
     let curFrameHint = 1 << (seqHeader.OrderHintBits - 1);
     let shiftedOrderHints: number[] = [];
-    for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+    for (let i = 0; i < NUM_REF_FRAMES; i++) {
       shiftedOrderHints[i] = curFrameHint + fho.get_relative_dist(fh.RefOrderHint[i], fh.OrderHint);
     }
     let lastOrderHint = shiftedOrderHints[fh.last_frame_idx];
@@ -67,7 +67,7 @@ export class SetFrameRefs {
       fh.ref_frame_idx[REF_FRAME.ALTREF2_FRAME - REF_FRAME.LAST_FRAME] = ref;
       usedFrame[ref] = 1;
     }
-    for (let i = 0; i < AV1.REFS_PER_FRAME - 2; i++) {
+    for (let i = 0; i < REFS_PER_FRAME - 2; i++) {
       let refFrame = Ref_Frame_List[i];
       if (fh.ref_frame_idx[refFrame - REF_FRAME.LAST_FRAME] < 0) {
         ref = this.find_latest_forward(shiftedOrderHints, usedFrame, curFrameHint);
@@ -80,14 +80,14 @@ export class SetFrameRefs {
 
     ref = -1;
     let earliestOrderHint = 0;
-    for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+    for (let i = 0; i < NUM_REF_FRAMES; i++) {
       let hint = shiftedOrderHints[i];
       if (ref < 0 || hint < earliestOrderHint) {
         ref = i;
         earliestOrderHint = hint;
       }
     }
-    for (let i = 0; i < AV1.REFS_PER_FRAME; i++) {
+    for (let i = 0; i < REFS_PER_FRAME; i++) {
       if (fh.ref_frame_idx[i] < 0) {
         fh.ref_frame_idx[i] = ref;
       }
@@ -102,7 +102,7 @@ export class SetFrameRefs {
   find_latest_backward(shiftedOrderHints: number[], usedFrame: number[], curFrameHint: number) {
     let ref = -1;
     let latestOrderHint: number = undefined as any;
-    for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+    for (let i = 0; i < NUM_REF_FRAMES; i++) {
       let hint = shiftedOrderHints[i];
       if (!usedFrame[i] && hint >= curFrameHint && (ref < 0 || hint >= latestOrderHint)) {
         ref = i;
@@ -120,7 +120,7 @@ export class SetFrameRefs {
   find_earliest_backward(shiftedOrderHints: number[], usedFrame: number[], curFrameHint: number) {
     let ref = -1;
     let earliestOrderHint: number = undefined as any;
-    for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+    for (let i = 0; i < NUM_REF_FRAMES; i++) {
       let hint = shiftedOrderHints[i];
       if (!usedFrame[i] && hint >= curFrameHint && (ref < 0 || hint < earliestOrderHint)) {
         ref = i;
@@ -138,7 +138,7 @@ export class SetFrameRefs {
   find_latest_forward(shiftedOrderHints: number[], usedFrame: number[], curFrameHint: number) {
     let ref = -1;
     let latestOrderHint: number = undefined as any;
-    for (let i = 0; i < AV1.NUM_REF_FRAMES; i++) {
+    for (let i = 0; i < NUM_REF_FRAMES; i++) {
       let hint = shiftedOrderHints[i];
       if (!usedFrame[i] && hint < curFrameHint && (ref < 0 || hint >= latestOrderHint)) {
         ref = i;

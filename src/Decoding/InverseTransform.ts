@@ -1,10 +1,24 @@
 import { Array2D, Clip3, clone, precision_restricted, Round2 } from "../Conventions";
-import * as AV1 from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { Tx_Height_Log2, Tx_Width_Log2 } from "../AdditionalTables/ConversionTables";
-
-const Transform_Row_Shift = [0, 1, 2, 2, 2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2];
+import {
+  ADST_ADST,
+  ADST_DCT,
+  ADST_FLIPADST,
+  DCT_ADST,
+  DCT_DCT,
+  DCT_FLIPADST,
+  FLIPADST_ADST,
+  FLIPADST_DCT,
+  FLIPADST_FLIPADST,
+  H_ADST,
+  H_DCT,
+  H_FLIPADST,
+  V_ADST,
+  V_DCT,
+  V_FLIPADST,
+} from "../define";
 
 /**
  * 7.13 Inverse transform process
@@ -634,17 +648,17 @@ export class InverseTransform {
       }
       if (isi.Lossless == 1) {
         this.inverse_WalshHadamard_transform_process(2);
-      } else if (coef.PlaneTxType === AV1.DCT_DCT || coef.PlaneTxType === AV1.ADST_DCT || coef.PlaneTxType === AV1.FLIPADST_DCT || coef.PlaneTxType === AV1.H_DCT) {
+      } else if (coef.PlaneTxType === DCT_DCT || coef.PlaneTxType === ADST_DCT || coef.PlaneTxType === FLIPADST_DCT || coef.PlaneTxType === H_DCT) {
         this.inverse_DCT_process(log2W, rowClampRange);
       } else if (
-        coef.PlaneTxType === AV1.DCT_ADST ||
-        coef.PlaneTxType === AV1.ADST_ADST ||
-        coef.PlaneTxType === AV1.DCT_FLIPADST ||
-        coef.PlaneTxType === AV1.FLIPADST_FLIPADST ||
-        coef.PlaneTxType === AV1.ADST_FLIPADST ||
-        coef.PlaneTxType === AV1.FLIPADST_ADST ||
-        coef.PlaneTxType === AV1.H_ADST ||
-        coef.PlaneTxType === AV1.H_FLIPADST
+        coef.PlaneTxType === DCT_ADST ||
+        coef.PlaneTxType === ADST_ADST ||
+        coef.PlaneTxType === DCT_FLIPADST ||
+        coef.PlaneTxType === FLIPADST_FLIPADST ||
+        coef.PlaneTxType === ADST_FLIPADST ||
+        coef.PlaneTxType === FLIPADST_ADST ||
+        coef.PlaneTxType === H_ADST ||
+        coef.PlaneTxType === H_FLIPADST
       ) {
         this.inverse_adst_process(log2W, rowClampRange);
       } else {
@@ -669,17 +683,17 @@ export class InverseTransform {
       }
       if (isi.Lossless == 1) {
         this.inverse_WalshHadamard_transform_process(2);
-      } else if (coef.PlaneTxType === AV1.DCT_DCT || coef.PlaneTxType === AV1.DCT_ADST || coef.PlaneTxType === AV1.DCT_FLIPADST || coef.PlaneTxType === AV1.V_DCT) {
+      } else if (coef.PlaneTxType === DCT_DCT || coef.PlaneTxType === DCT_ADST || coef.PlaneTxType === DCT_FLIPADST || coef.PlaneTxType === V_DCT) {
         this.inverse_DCT_process(log2H, colClampRange);
       } else if (
-        coef.PlaneTxType === AV1.ADST_DCT ||
-        coef.PlaneTxType === AV1.ADST_ADST ||
-        coef.PlaneTxType === AV1.FLIPADST_DCT ||
-        coef.PlaneTxType === AV1.FLIPADST_FLIPADST ||
-        coef.PlaneTxType === AV1.ADST_FLIPADST ||
-        coef.PlaneTxType === AV1.FLIPADST_ADST ||
-        coef.PlaneTxType === AV1.V_ADST ||
-        coef.PlaneTxType === AV1.V_FLIPADST
+        coef.PlaneTxType === ADST_DCT ||
+        coef.PlaneTxType === ADST_ADST ||
+        coef.PlaneTxType === FLIPADST_DCT ||
+        coef.PlaneTxType === FLIPADST_FLIPADST ||
+        coef.PlaneTxType === ADST_FLIPADST ||
+        coef.PlaneTxType === FLIPADST_ADST ||
+        coef.PlaneTxType === V_ADST ||
+        coef.PlaneTxType === V_FLIPADST
       ) {
         this.inverse_adst_process(log2H, colClampRange);
       } else {
@@ -691,3 +705,5 @@ export class InverseTransform {
     }
   }
 }
+
+const Transform_Row_Shift = [0, 1, 2, 2, 2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2];

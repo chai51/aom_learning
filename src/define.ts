@@ -3,7 +3,6 @@ export const REFS_PER_FRAME = 7;
 export const TOTAL_REFS_PER_FRAME = 8;
 export const BLOCK_SIZE_GROUPS = 4;
 export const BLOCK_SIZES = 22;
-export const BLOCK_INVALID = 22;
 export const MAX_SB_SIZE = 128;
 export const MI_SIZE = 4;
 export const MI_SIZE_LOG2 = 2;
@@ -189,6 +188,9 @@ export const COEFF_CDF_Q_CTXS = 4;
 export const PRIMARY_REF_NONE = 7;
 export const BUFFER_POOL_MAX_SIZE = 10;
 
+// 使用空值来检测未初始化的变量
+export const UNKNOWN_VALUE: any = undefined;
+
 export const INT8_MIN = -128;
 export const INT16_MIN = -32768;
 export const INT32_MIN = -2147483648;
@@ -198,20 +200,3 @@ export const INT32_MAX = 2147483647;
 export const UINT8_MAX = 255;
 export const UINT16_MAX = 65535;
 export const UINT32_MAX = 4294967295;
-/*
-tile_size_minus_1
-
-比特流中的语法元素以粗体表示
-
-由小写和大写字母混合命名，并且没有任何下划线字符.
-以大写字母开头的变量是为当前语法结构和所有相关语法结构的解码而派生的，这些变量可以在以后的语法结构的解码过程中使用。
-以小写字母开头的变量只能在派生它们的过程中使用
-
-
-常量值出现在所有带有下划线字符的大写字母中（例如MI_SIZE）
-
-
-常量查找表显示为 Block_Width[…] 分隔的单词（每个单词的第一个字母大写，其余字母小写）。
-
-
-*/

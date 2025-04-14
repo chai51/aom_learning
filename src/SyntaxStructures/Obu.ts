@@ -37,7 +37,12 @@ export class Obu extends EventEmitter {
   obuHeader: ObuHeader;
   private decoder: AV1Decoder;
 
+  // 最终帧/胶片颗粒帧
   onFrame?: (frame: number[][][]) => void;
+  // 预测帧
+  onPredFrame?: (plane: number, startX: number, startY: number, frame: number[][]) => void;
+  // 残差帧
+  onResidualFrame?: (plane: number, startX: number, startY: number, frame: number[][]) => void;
 
   constructor() {
     super();

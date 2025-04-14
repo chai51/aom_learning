@@ -313,39 +313,7 @@ export enum SUB_SIZE {
   BLOCK_32X8 = 19,
   BLOCK_16X64 = 20,
   BLOCK_64X16 = 21,
-}
-
-// 6.10.6 Intra frame mode info semantics
-enum INTRA_FRAME_Y_MODE {
-  DC_PRED = 0,
-  V_PRED = 1,
-  H_PRED = 2,
-  D45_PRED = 3,
-  D135_PRED = 4,
-  D113_PRED = 5,
-  D157_PRED = 6,
-  D203_PRED = 7,
-  D67_PRED = 8,
-  SMOOTH_PRED = 9,
-  SMOOTH_V_PRED = 10,
-  SMOOTH_H_PRED = 11,
-  PAETH_PRED = 12,
-}
-export enum UV_MODE {
-  DC_PRED = 0,
-  V_PRED = 1,
-  H_PRED = 2,
-  D45_PRED = 3,
-  D135_PRED = 4,
-  D113_PRED = 5,
-  D157_PRED = 6,
-  D203_PRED = 7,
-  D67_PRED = 8,
-  SMOOTH_PRED = 9,
-  SMOOTH_V_PRED = 10,
-  SMOOTH_H_PRED = 11,
-  PAETH_PRED = 12,
-  UV_CFL_PRED = 13,
+  BLOCK_INVALID = 22,
 }
 
 /**
@@ -434,6 +402,20 @@ export enum SET {
 
 // 6.10.22 Inter block mode info semantics
 export enum Y_MODE {
+  DC_PRED = 0,
+  V_PRED = 1,
+  H_PRED = 2,
+  D45_PRED = 3,
+  D135_PRED = 4,
+  D113_PRED = 5,
+  D157_PRED = 6,
+  D203_PRED = 7,
+  D67_PRED = 8,
+  SMOOTH_PRED = 9,
+  SMOOTH_V_PRED = 10,
+  SMOOTH_H_PRED = 11,
+  PAETH_PRED = 12,
+  UV_CFL_PRED = 13,
   NEARESTMV = 14,
   NEARMV = 15,
   GLOBALMV = 16,
@@ -559,3 +541,45 @@ export enum SIGN_UV {
   CFL_SIGN_NEG = 1,
   CFL_SIGN_POS = 2,
 }
+
+/**
+ * 9.3 Conversion tables
+ */
+export const Mi_Width_Log2 = [0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 0, 2, 1, 3, 2, 4];
+
+export const Mi_Height_Log2 = [0, 1, 0, 1, 2, 1, 2, 3, 2, 3, 4, 3, 4, 5, 4, 5, 2, 0, 3, 1, 4, 2];
+
+export const Num_4x4_Blocks_Wide = [1, 1, 2, 2, 2, 4, 4, 4, 8, 8, 8, 16, 16, 16, 32, 32, 1, 4, 2, 8, 4, 16];
+
+export const Block_Width = Num_4x4_Blocks_Wide.map((a) => 4 * a);
+
+export const Num_4x4_Blocks_High = [1, 2, 1, 2, 4, 2, 4, 8, 4, 8, 16, 8, 16, 32, 16, 32, 4, 1, 8, 2, 16, 4];
+
+export const Block_Height = Num_4x4_Blocks_High.map((a) => 4 * a);
+
+export const Size_Group = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 0, 0, 1, 1, 2, 2];
+
+export const Max_Tx_Size_Rect = [
+  TX_SIZE.TX_4X4,
+  TX_SIZE.TX_4X8,
+  TX_SIZE.TX_8X4,
+  TX_SIZE.TX_8X8,
+  TX_SIZE.TX_8X16,
+  TX_SIZE.TX_16X8,
+  TX_SIZE.TX_16X16,
+  TX_SIZE.TX_16X32,
+  TX_SIZE.TX_32X16,
+  TX_SIZE.TX_32X32,
+  TX_SIZE.TX_32X64,
+  TX_SIZE.TX_64X32,
+  TX_SIZE.TX_64X64,
+  TX_SIZE.TX_64X64,
+  TX_SIZE.TX_64X64,
+  TX_SIZE.TX_64X64,
+  TX_SIZE.TX_4X16,
+  TX_SIZE.TX_16X4,
+  TX_SIZE.TX_8X32,
+  TX_SIZE.TX_32X8,
+  TX_SIZE.TX_16X64,
+  TX_SIZE.TX_64X16,
+];

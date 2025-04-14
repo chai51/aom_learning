@@ -1,26 +1,7 @@
 import { Array2D, Clip1, Clip3, clone, integer, Round2 } from "../Conventions";
-import * as AV1 from "../define";
+import { FILTER_BITS, MI_SIZE, MI_SIZE_LOG2, SGRPROJ_MTABLE_BITS, SGRPROJ_PRJ_BITS, SGRPROJ_RECIP_BITS, SGRPROJ_RST_BITS, SGRPROJ_SGR_BITS } from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 import { FRAME_RESTORATION_TYPE } from "../SyntaxStructures/Semantics";
-
-export const Sgr_Params = [
-  [2, 12, 1, 4],
-  [2, 15, 1, 6],
-  [2, 18, 1, 8],
-  [2, 21, 1, 9],
-  [2, 24, 1, 10],
-  [2, 29, 1, 11],
-  [2, 36, 1, 12],
-  [2, 45, 1, 13],
-  [2, 56, 1, 14],
-  [2, 68, 1, 15],
-  [0, 0, 1, 5],
-  [0, 0, 1, 8],
-  [0, 0, 1, 11],
-  [0, 0, 1, 14],
-  [2, 30, 0, 0],
-  [2, 75, 0, 0],
-];
 
 /**
  * 7.17 Loop restoration process
@@ -61,12 +42,12 @@ export class LoopRestoration {
       return;
     }
 
-    for (let y = 0; y < fs.FrameHeight; y += AV1.MI_SIZE) {
-      for (let x = 0; x < fswr.UpscaledWidth; x += AV1.MI_SIZE) {
+    for (let y = 0; y < fs.FrameHeight; y += MI_SIZE) {
+      for (let x = 0; x < fswr.UpscaledWidth; x += MI_SIZE) {
         for (let plane = 0; plane < cc.NumPlanes; plane++) {
           if (lp.FrameRestorationType[plane] != FRAME_RESTORATION_TYPE.RESTORE_NONE) {
-            let row = y >> AV1.MI_SIZE_LOG2;
-            let col = x >> AV1.MI_SIZE_LOG2;
+            let row = y >> MI_SIZE_LOG2;
+            let col = x >> MI_SIZE_LOG2;
             this.loop_restore_block(plane, row, col);
           }
         }
@@ -89,7 +70,7 @@ export class LoopRestoration {
     const tg = tgo.titleGroup;
     const lp = tg.lr_params;
 
-    let lumaY = row * AV1.MI_SIZE;
+    let lumaY = row * MI_SIZE;
     let stripeNum = integer((lumaY + 8) / 64);
 
     let subX = cc.subsampling_x;
@@ -104,15 +85,15 @@ export class LoopRestoration {
     let unitSize = lp.LoopRestorationSize[plane];
     let unitRows = tgo.count_units_in_frame(unitSize, Round2(fs.FrameHeight, subY));
     let unitCols = tgo.count_units_in_frame(unitSize, Round2(fswr.UpscaledWidth, subX));
-    let unitRow = Math.min(unitRows - 1, integer(((row * AV1.MI_SIZE + 8) >> subY) / unitSize));
-    let unitCol = Math.min(unitCols - 1, integer(((col * AV1.MI_SIZE) >> subX) / unitSize));
+    let unitRow = Math.min(unitRows - 1, integer(((row * MI_SIZE + 8) >> subY) / unitSize));
+    let unitCol = Math.min(unitCols - 1, integer(((col * MI_SIZE) >> subX) / unitSize));
 
     this.PlaneEndX = Round2(fswr.UpscaledWidth, subX) - 1;
     this.PlaneEndY = Round2(fs.FrameHeight, subY) - 1;
-    let x = (col * AV1.MI_SIZE) >> subX;
-    let y = (row * AV1.MI_SIZE) >> subY;
-    let w = Math.min(AV1.MI_SIZE >> subX, this.PlaneEndX - x + 1);
-    let h = Math.min(AV1.MI_SIZE >> subY, this.PlaneEndY - y + 1);
+    let x = (col * MI_SIZE) >> subX;
+    let y = (row * MI_SIZE) >> subY;
+    let w = Math.min(MI_SIZE >> subX, this.PlaneEndX - x + 1);
+    let h = Math.min(MI_SIZE >> subY, this.PlaneEndY - y + 1);
     let rType = lp.LrType[plane][unitRow][unitCol];
 
     if (rType == FRAME_RESTORATION_TYPE.RESTORE_WIENER) {
@@ -148,12 +129,12 @@ export class LoopRestoration {
 
     let w0 = lp.LrSgrXqd[plane][unitRow][unitCol][0];
     let w1 = lp.LrSgrXqd[plane][unitRow][unitCol][1];
-    let w2 = (1 << AV1.SGRPROJ_PRJ_BITS) - w0 - w1;
+    let w2 = (1 << SGRPROJ_PRJ_BITS) - w0 - w1;
     let r0 = Sgr_Params[set][0];
     let r1 = Sgr_Params[set][2];
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
-        let u = dfw.UpscaledCdefFrame[plane][y + i][x + j] << AV1.SGRPROJ_RST_BITS;
+        let u = dfw.UpscaledCdefFrame[plane][y + i][x + j] << SGRPROJ_RST_BITS;
         let v = w1 * u;
         if (r0) {
           v += w0 * flt0[i][j];
@@ -163,7 +144,7 @@ export class LoopRestoration {
         } else {
           v += w2 * u;
         }
-        let s = Round2(v, AV1.SGRPROJ_RST_BITS + AV1.SGRPROJ_PRJ_BITS);
+        let s = Round2(v, SGRPROJ_RST_BITS + SGRPROJ_PRJ_BITS);
         this.LrFrame[plane][y + i][x + j] = Clip1(s, cc.BitDepth);
       }
     }
@@ -188,7 +169,7 @@ export class LoopRestoration {
 
     let n = (2 * r + 1) * (2 * r + 1);
     let n2e = n * n * eps;
-    let s = integer(((1 << AV1.SGRPROJ_MTABLE_BITS) + integer(n2e / 2)) / n2e);
+    let s = integer(((1 << SGRPROJ_MTABLE_BITS) + integer(n2e / 2)) / n2e);
     let A = Array2D({ startIndex: -1, endIndex: h + 1 });
     let B = Array2D({ startIndex: -1, endIndex: h + 1 });
     for (let i = -1; i < h + 1; i++) {
@@ -205,19 +186,19 @@ export class LoopRestoration {
         a = Round2(a, 2 * (cc.BitDepth - 8));
         let d = Round2(b, cc.BitDepth - 8);
         let p = Math.max(0, a * n - d * d);
-        let z = Round2(p * s, AV1.SGRPROJ_MTABLE_BITS);
+        let z = Round2(p * s, SGRPROJ_MTABLE_BITS);
         let a2: number;
         if (z >= 255) {
           a2 = 256;
         } else if (z == 0) {
           a2 = 1;
         } else {
-          a2 = integer(((z << AV1.SGRPROJ_SGR_BITS) + integer(z / 2)) / (z + 1));
+          a2 = integer(((z << SGRPROJ_SGR_BITS) + integer(z / 2)) / (z + 1));
         }
-        let oneOverN = integer(((1 << AV1.SGRPROJ_RECIP_BITS) + integer(n / 2)) / n);
-        let b2 = ((1 << AV1.SGRPROJ_SGR_BITS) - a2) * b * oneOverN;
+        let oneOverN = integer(((1 << SGRPROJ_RECIP_BITS) + integer(n / 2)) / n);
+        let b2 = ((1 << SGRPROJ_SGR_BITS) - a2) * b * oneOverN;
         A[i][j] = a2;
-        B[i][j] = Round2(b2, AV1.SGRPROJ_RECIP_BITS);
+        B[i][j] = Round2(b2, SGRPROJ_RECIP_BITS);
       }
     }
 
@@ -247,7 +228,7 @@ export class LoopRestoration {
           }
         }
         let v = a * dfw.UpscaledCdefFrame[plane][y + i][x + j] + b;
-        F[i][j] = Round2(v, AV1.SGRPROJ_SGR_BITS + shift - AV1.SGRPROJ_RST_BITS);
+        F[i][j] = Round2(v, SGRPROJ_SGR_BITS + shift - SGRPROJ_RST_BITS);
       }
     }
     return F;
@@ -269,8 +250,8 @@ export class LoopRestoration {
     let vfilter = this.wiener_coefficient(lp.LrWiener[plane][unitRow][unitCol][0]);
     let hfilter = this.wiener_coefficient(lp.LrWiener[plane][unitRow][unitCol][1]);
 
-    let offset = 1 << (cc.BitDepth + AV1.FILTER_BITS - p.InterRound0 - 1);
-    let limit = (1 << (cc.BitDepth + 1 + AV1.FILTER_BITS - p.InterRound0)) - 1;
+    let offset = 1 << (cc.BitDepth + FILTER_BITS - p.InterRound0 - 1);
+    let limit = (1 << (cc.BitDepth + 1 + FILTER_BITS - p.InterRound0)) - 1;
     let intermediate = Array2D(h + 6);
     for (let r = 0; r < h + 6; r++) {
       for (let c = 0; c < w; c++) {
@@ -335,3 +316,23 @@ export class LoopRestoration {
     }
   }
 }
+
+
+export const Sgr_Params = [
+  [2, 12, 1, 4],
+  [2, 15, 1, 6],
+  [2, 18, 1, 8],
+  [2, 21, 1, 9],
+  [2, 24, 1, 10],
+  [2, 29, 1, 11],
+  [2, 36, 1, 12],
+  [2, 45, 1, 13],
+  [2, 56, 1, 14],
+  [2, 68, 1, 15],
+  [0, 0, 1, 5],
+  [0, 0, 1, 8],
+  [0, 0, 1, 11],
+  [0, 0, 1, 14],
+  [2, 30, 0, 0],
+  [2, 75, 0, 0],
+];

@@ -1,10 +1,10 @@
 import { Clip3, integer, Round2 } from "../Conventions";
-import * as AV1 from "../define";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { REF_FRAME, Y_MODE } from "../SyntaxStructures/Semantics";
 
 import { Block_Height, Block_Width, Tx_Height, Tx_Width } from "../AdditionalTables/ConversionTables";
+import { MAX_LOOP_FILTER, MI_SIZE, SEG_LVL_ALT_LF_Y_V } from "../define";
 
 /**
  * 7.14 Loop filter process
@@ -76,8 +76,8 @@ export class LoopFilter {
       dy = 0;
     }
 
-    let x = col * AV1.MI_SIZE;
-    let y = row * AV1.MI_SIZE;
+    let x = col * MI_SIZE;
+    let y = row * MI_SIZE;
     row = row | subY;
     col = col | subX;
 
@@ -141,7 +141,7 @@ export class LoopFilter {
       thresh = afs.thresh;
     }
 
-    for (let i = 0; i < AV1.MI_SIZE; i++) {
+    for (let i = 0; i < MI_SIZE; i++) {
       if (applyFilter == 1 && lvl > 0) {
         this.sample_filtering(xP + dy * i, yP + dx * i, plane, limit, blimit, thresh, dx, dy, filterSize);
       }
@@ -226,20 +226,20 @@ export class LoopFilter {
     const sp = fh.segmentation_params;
 
     let i = plane == 0 ? pass : plane + 1;
-    let baseFilterLevel = Clip3(0, AV1.MAX_LOOP_FILTER, deltaLF + lfp.loop_filter_level[i]);
+    let baseFilterLevel = Clip3(0, MAX_LOOP_FILTER, deltaLF + lfp.loop_filter_level[i]);
 
     // 1.
     let lvlSeg = baseFilterLevel;
 
     // 2.
-    let feature = AV1.SEG_LVL_ALT_LF_Y_V + i;
+    let feature = SEG_LVL_ALT_LF_Y_V + i;
 
     // 3.
     if (this.decoder.tileGroupObu.seg_feature_active_idx(segment, feature) == 1) {
       // a.
       lvlSeg = sp.FeatureData[segment][feature] + lvlSeg;
       // b.
-      lvlSeg = Clip3(0, AV1.MAX_LOOP_FILTER, lvlSeg);
+      lvlSeg = Clip3(0, MAX_LOOP_FILTER, lvlSeg);
     }
 
     // 4.
@@ -255,7 +255,7 @@ export class LoopFilter {
         lvlSeg = lvlSeg + (lfp.loop_filter_ref_deltas[ref] << nShift) + (lfp.loop_filter_mode_deltas[modeType] << nShift);
       }
       // d.
-      lvlSeg = Clip3(0, AV1.MAX_LOOP_FILTER, lvlSeg);
+      lvlSeg = Clip3(0, MAX_LOOP_FILTER, lvlSeg);
     }
 
     // 5.
