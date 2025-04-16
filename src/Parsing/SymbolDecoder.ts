@@ -16,9 +16,9 @@ export class SymbolDecoder {
   Tile_non_coeff_cdfs: NonCoeffCdfs = {} as any;
   Tile_coeff_cdfs: CoeffCdfs = {} as any;
 
-  private SymbolValue: number = undefined as any;
-  private SymbolRange: number = undefined as any;
-  private SymbolMaxBits: number = undefined as any;
+  private SymbolValue!: number;
+  private SymbolRange!: number;
+  private SymbolMaxBits!: number;
   private decoder: AV1Decoder;
   private reader: BitReader;
 

@@ -101,7 +101,7 @@ export class SetFrameRefs {
    */
   find_latest_backward(shiftedOrderHints: number[], usedFrame: number[], curFrameHint: number) {
     let ref = -1;
-    let latestOrderHint: number = undefined as any;
+    let latestOrderHint!: number;
     for (let i = 0; i < NUM_REF_FRAMES; i++) {
       let hint = shiftedOrderHints[i];
       if (!usedFrame[i] && hint >= curFrameHint && (ref < 0 || hint >= latestOrderHint)) {
@@ -119,7 +119,7 @@ export class SetFrameRefs {
    */
   find_earliest_backward(shiftedOrderHints: number[], usedFrame: number[], curFrameHint: number) {
     let ref = -1;
-    let earliestOrderHint: number = undefined as any;
+    let earliestOrderHint!: number;
     for (let i = 0; i < NUM_REF_FRAMES; i++) {
       let hint = shiftedOrderHints[i];
       if (!usedFrame[i] && hint >= curFrameHint && (ref < 0 || hint < earliestOrderHint)) {
@@ -137,7 +137,7 @@ export class SetFrameRefs {
    */
   find_latest_forward(shiftedOrderHints: number[], usedFrame: number[], curFrameHint: number) {
     let ref = -1;
-    let latestOrderHint: number = undefined as any;
+    let latestOrderHint!: number;
     for (let i = 0; i < NUM_REF_FRAMES; i++) {
       let hint = shiftedOrderHints[i];
       if (!usedFrame[i] && hint < curFrameHint && (ref < 0 || hint >= latestOrderHint)) {

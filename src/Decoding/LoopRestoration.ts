@@ -9,15 +9,14 @@ import { FRAME_RESTORATION_TYPE } from "../SyntaxStructures/Semantics";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#loop-restoration-process)
  */
 export class LoopRestoration {
-  LrFrame: number[][][];
-  private StripeStartY: number = undefined as any;
-  private StripeEndY: number = undefined as any;
-  private PlaneEndX: number = undefined as any;
-  private PlaneEndY: number = undefined as any;
+  LrFrame: number[][][] = [];
+  private StripeStartY!: number ;
+  private StripeEndY!: number;
+  private PlaneEndX!: number;
+  private PlaneEndY!: number;
 
   private decoder: AV1Decoder;
   constructor(d: AV1Decoder) {
-    this.LrFrame = [];
     this.decoder = d;
   }
 
@@ -162,7 +161,7 @@ export class LoopRestoration {
 
     let r = Sgr_Params[set][pass * 2 + 0];
     if (r == 0) {
-      return undefined as any;
+      return null as any;
     }
 
     let eps = Sgr_Params[set][pass * 2 + 1];
@@ -170,8 +169,8 @@ export class LoopRestoration {
     let n = (2 * r + 1) * (2 * r + 1);
     let n2e = n * n * eps;
     let s = integer(((1 << SGRPROJ_MTABLE_BITS) + integer(n2e / 2)) / n2e);
-    let A = Array2D({ startIndex: -1, endIndex: h + 1 });
-    let B = Array2D({ startIndex: -1, endIndex: h + 1 });
+    let A = Array2D<number>(null, { begin: -1, end: h + 1 });
+    let B = Array2D<number>(null, { begin: -1, end: h + 1 });
     for (let i = -1; i < h + 1; i++) {
       for (let j = -1; j < w + 1; j++) {
         let a = 0;
@@ -202,7 +201,7 @@ export class LoopRestoration {
       }
     }
 
-    let F = Array2D(h);
+    let F = Array2D<number>(null, h);
     for (let i = 0; i < h; i++) {
       let shift = 5;
       if (pass == 0 && i & 1) {
@@ -252,7 +251,7 @@ export class LoopRestoration {
 
     let offset = 1 << (cc.BitDepth + FILTER_BITS - p.InterRound0 - 1);
     let limit = (1 << (cc.BitDepth + 1 + FILTER_BITS - p.InterRound0)) - 1;
-    let intermediate = Array2D(h + 6);
+    let intermediate = Array2D<number>(null, h + 6);
     for (let r = 0; r < h + 6; r++) {
       for (let c = 0; c < w; c++) {
         let s = 0;
@@ -316,7 +315,6 @@ export class LoopRestoration {
     }
   }
 }
-
 
 export const Sgr_Params = [
   [2, 12, 1, 4],

@@ -51,7 +51,7 @@ export class TileListObu {
     tle.tile_data_size_minus_1 = reader.f(16);
     let N = 8 * (tle.tile_data_size_minus_1 + 1);
     tle.coded_tile_data = reader.byte(N);
-    lstd.general(Array4D(64, 64, 64), tile);
+    lstd.general(Array4D<number>(null, 64, 64, 64), tile);
   }
 }
 

@@ -1,4 +1,4 @@
-import { Array3D, clone } from "../Conventions";
+import { clone } from "../Conventions";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 import { FRAME_TYPE } from "../SyntaxStructures/Semantics";
 
@@ -8,34 +8,17 @@ import { FRAME_TYPE } from "../SyntaxStructures/Semantics";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#decode-frame-wrapup-process)
  */
 export class DecodeFrameWrapup {
-  CdefFrame: number[][][];
-  UpscaledCdefFrame: number[][][];
-  UpscaledCurrFrame: number[][][];
+  CdefFrame: number[][][] = [];
+  UpscaledCdefFrame: number[][][] = [];
+  UpscaledCurrFrame: number[][][] = [];
 
-  private init: boolean;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
-
-    this.CdefFrame = [];
-    this.UpscaledCdefFrame = Array3D(3, 64);
-    this.UpscaledCurrFrame = Array3D(3, 64);
-
     this.decoder = d;
   }
 
-  initialize() {
-    if (this.init) {
-      return;
-    }
-    this.init = true;
-
-    const maxHeight = this.decoder.frameHeaderObu.frameHeader.frame_size.FrameHeight;
-    const plane = 3;
-
-    this.CdefFrame = Array3D(plane, maxHeight);
-  }
+  initialize() {}
 
   /**
    * 7.4 Decode frame wrapup process

@@ -26,15 +26,12 @@ import {
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#inverse-transform-process)
  */
 export class InverseTransform {
-  Residual: number[][];
-  private T: number[];
+  Residual: number[][] = [];
+  private T: number[] = [];
 
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.Residual = Array2D(64);
-    this.T = [];
-
     this.decoder = d;
   }
 
@@ -629,8 +626,8 @@ export class InverseTransform {
     let colShift = isi.Lossless ? 0 : 4;
     const rowClampRange = cc.BitDepth + 8;
     const colClampRange = Math.max(cc.BitDepth + 6, 16);
-    this.Residual = Array2D(h);
 
+    this.Residual = Array2D(this.Residual, h);
     for (let i = 0; i < h; i++) {
       let T: number[] = [];
       this.T = T;

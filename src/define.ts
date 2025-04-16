@@ -188,9 +188,6 @@ export const COEFF_CDF_Q_CTXS = 4;
 export const PRIMARY_REF_NONE = 7;
 export const BUFFER_POOL_MAX_SIZE = 10;
 
-// 使用空值来检测未初始化的变量
-export const UNKNOWN_VALUE: any = undefined;
-
 export const INT8_MIN = -128;
 export const INT16_MIN = -32768;
 export const INT32_MIN = -2147483648;

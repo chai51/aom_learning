@@ -21,28 +21,18 @@ import { FRAME_TYPE, REF_FRAME } from "../SyntaxStructures/Semantics";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#motion-field-estimation-process)
  */
 export class MotionFieldEstimation {
-  MotionFieldMvs: number[][][][];
-  private PosY8: number = undefined as any;
-  private PosX8: number = undefined as any;
-  SavedOrderHints: number[][];
+  MotionFieldMvs: number[][][][] = [];
+  private PosY8!: number;
+  private PosX8!: number;
+  SavedOrderHints: number[][] = [];
 
-  private init: boolean;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
-    this.MotionFieldMvs = Array4D(NUM_REF_FRAMES, 64, 64);
-    this.SavedOrderHints = Array2D(NUM_REF_FRAMES);
-
     this.decoder = d;
   }
 
-  initialize() {
-    if (this.init) {
-      return;
-    }
-    this.init = true;
-  }
+  initialize() {}
 
   /**
    * 7.9.1 General
@@ -59,6 +49,7 @@ export class MotionFieldEstimation {
     let w8 = cis.MiCols >> 1;
     let h8 = cis.MiRows >> 1;
 
+    this.MotionFieldMvs = Array4D(this.MotionFieldMvs, REF_FRAME.ALTREF_FRAME + 1, h8, w8);
     for (let ref = REF_FRAME.LAST_FRAME; ref <= REF_FRAME.ALTREF_FRAME; ref++)
       for (let y = 0; y < h8; y++)
         for (let x = 0; x < w8; x++)
@@ -224,28 +215,13 @@ export class ReferenceFrameUpdate {
   SavedRefFrames: number[][][] = [];
   SavedMvs: number[][][][] = [];
 
-  private init: boolean;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
     this.decoder = d;
   }
 
-  initialize() {
-    if (this.init) {
-      return;
-    }
-    this.init = true;
-
-    const fh = this.decoder.frameHeaderObu.frameHeader;
-    const fs = fh.frame_size;
-    const cis = fh.compute_image_size;
-
-    this.FrameStore = Array4D(NUM_REF_FRAMES, 3, fs.FrameHeight);
-    this.SavedRefFrames = Array3D(NUM_REF_FRAMES, cis.MiRows);
-    this.SavedMvs = Array4D(NUM_REF_FRAMES, cis.MiRows, cis.MiCols);
-  }
+  initialize() {}
 
   /**
    * 7.20 Reference frame update process
@@ -274,6 +250,12 @@ export class ReferenceFrameUpdate {
     const lr = this.decoder.loopRestoration;
     const mfmvs = this.decoder.motionFieldMotionVectorStorage;
 
+    mfe.SavedOrderHints = Array2D(mfe.SavedOrderHints, NUM_REF_FRAMES);
+    this.FrameStore = Array4D(this.FrameStore, NUM_REF_FRAMES, 3, fs.FrameHeight);
+    this.SavedRefFrames = Array3D(this.SavedRefFrames, NUM_REF_FRAMES, cis.MiRows);
+    this.SavedMvs = Array4D(this.SavedMvs, NUM_REF_FRAMES, cis.MiRows, cis.MiCols);
+    psi.SavedGmParams = Array3D(psi.SavedGmParams, NUM_REF_FRAMES, REF_FRAME.ALTREF_FRAME + 1);
+    db.SavedSegmentIds = Array3D(db.SavedSegmentIds, NUM_REF_FRAMES, cis.MiRows);
     for (let i = 0; i < NUM_REF_FRAMES; i++) {
       if (((fh.refresh_frame_flags >> i) & 1) == 1) {
         rfm.RefValid[i] = 1;

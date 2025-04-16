@@ -1,4 +1,4 @@
-import { Array2D, Clip3, FloorLog2, integer } from "../Conventions";
+import { Array2D, Array3D, Clip3, FloorLog2, integer } from "../Conventions";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { SUB_SIZE } from "../SyntaxStructures/Semantics";
@@ -12,7 +12,7 @@ import { MI_SIZE, MI_SIZE_LOG2 } from "../define";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#cdef-process)
  */
 export class CDEF {
-  private CdefAvailable: number = undefined as any;
+  private CdefAvailable!: number;
 
   private decoder: AV1Decoder;
   constructor(d: AV1Decoder) {
@@ -61,6 +61,7 @@ export class CDEF {
     let endY = startY + MI_SIZE * 2;
     let startX = c * MI_SIZE;
     let endX = startX + MI_SIZE * 2;
+    dfw.CdefFrame = Array3D(dfw.CdefFrame, cc.NumPlanes, endY);
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
         dfw.CdefFrame[0][y][x] = p.CurrFrame[0][y][x];
@@ -133,7 +134,7 @@ export class CDEF {
     const Div_Table = [0, 840, 420, 280, 210, 168, 140, 120, 105];
 
     let cost: number[] = [];
-    let partial = Array2D(8);
+    let partial = Array2D<number>(null, 8);
     for (let i = 0; i < 8; i++) {
       cost[i] = 0;
       for (let j = 0; j < 15; j++) {

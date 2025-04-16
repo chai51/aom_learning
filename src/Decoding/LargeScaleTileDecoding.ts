@@ -1,4 +1,4 @@
-import { Array2D, clone, integer } from "../Conventions";
+import { clone, integer } from "../Conventions";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { FRAME_TYPE, SUB_SIZE } from "../SyntaxStructures/Semantics";
@@ -13,35 +13,20 @@ import { MI_SIZE } from "../define";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#large-scale-tile-decoding-process)
  */
 export class LargeScaleTileDecoding {
-  RefSubsamplingX: number[];
-  RefSubsamplingY: number[];
-  RefBitDepth: number[];
-  private OutputFrameY: number[][];
-  private OutputFrameU: number[][];
-  private OutputFrameV: number[][];
+  RefSubsamplingX: number[] = [];
+  RefSubsamplingY: number[] = [];
+  RefBitDepth: number[] = [];
+  private OutputFrameY: number[][] = [];
+  private OutputFrameU: number[][] = [];
+  private OutputFrameV: number[][] = [];
 
-  private init: boolean;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
-
-    this.RefSubsamplingX = [];
-    this.RefSubsamplingY = [];
-    this.RefBitDepth = [];
-    this.OutputFrameY = Array2D(64);
-    this.OutputFrameU = Array2D(64);
-    this.OutputFrameV = Array2D(64);
-
     this.decoder = d;
   }
 
-  initialize() {
-    if (this.init) {
-      return;
-    }
-    this.init = true;
-  }
+  initialize() {}
 
   /**
    * 7.3.1 General

@@ -12,12 +12,10 @@ import { MAX_LOOP_FILTER, MI_SIZE, SEG_LVL_ALT_LF_Y_V } from "../define";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#loop-filter-process)
  */
 export class LoopFilter {
-  private F: number[];
+  private F: number[] = [];
 
   private decoder: AV1Decoder;
   constructor(d: AV1Decoder) {
-    this.F = [];
-
     this.decoder = d;
   }
 

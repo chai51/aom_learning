@@ -129,15 +129,12 @@ export function CeilLog2(x: number) {
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#descriptors)
  */
 export class BitReader {
-  private buffer: Buffer;
-  private bitOffset: number;
+  private buffer: Buffer = Buffer.alloc(0);
+  private bitOffset: number = 0;
 
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.buffer = Buffer.alloc(0);
-    this.bitOffset = 0;
-
     this.decoder = d;
   }
 
@@ -448,70 +445,101 @@ export class BitReader {
 type IndexRange =
   | number
   | {
-      startIndex: number;
-      endIndex: number;
+      begin: number;
+      end: number;
     };
 
-export function Array1D(len1?: IndexRange, fill?: any) {
-  if (typeof len1 == "undefined") {
-    return [];
-  } else if (typeof len1 == "number") {
-    return Array.from({ length: len1 }, (item) => fill);
-  } else {
-    let arr: any[] = [];
-    for (let i = len1.startIndex; i < len1.endIndex; i++) {
+export function Array1D<T>(arr: T[] | null, len1?: IndexRange, fill?: T): T[] {
+  if (arr == null) {
+    arr = [];
+  }
+  if (len1 == undefined) {
+    return arr;
+  }
+  if (fill == undefined) {
+    return arr;
+  }
+
+  if (typeof len1 == "number") {
+    for (let i = arr.length; i < len1; i++) {
       arr[i] = fill;
     }
-    return arr;
+  } else {
+    for (let i = len1.begin; i < len1.end; i++) {
+      if (arr[i] == undefined) {
+        arr[i] = fill;
+      }
+    }
   }
+  return arr;
 }
 
-export function Array2D(len1: IndexRange, len2?: IndexRange, fill?: any): any[][] {
-  if (typeof len1 == "number") {
-    return Array.from({ length: len1 }, (item) => Array1D(len2, fill));
-  } else {
-    let arr: any[] = [];
-    for (let i = len1.startIndex; i < len1.endIndex; i++) {
-      arr[i] = Array1D(len2, fill);
-    }
-    return arr;
+export function Array2D<T>(arr: T[][] | null, len1: IndexRange, len2?: IndexRange, fill?: T): T[][] {
+  if (arr == null) {
+    arr = [];
   }
+
+  if (typeof len1 == "number") {
+    for (let i = 0; i < len1; i++) {
+      arr[i] = Array1D(arr[i], len2, fill);
+    }
+  } else {
+    for (let i = len1.begin; i < len1.end; i++) {
+      arr[i] = Array1D(arr[i], len2, fill);
+    }
+  }
+  return arr;
 }
 
-export function Array3D(len1: IndexRange, len2: IndexRange, len3?: IndexRange, fill?: any): any[][][] {
-  if (typeof len1 == "number") {
-    return Array.from({ length: len1 }, (item) => Array2D(len2, len3, fill));
-  } else {
-    let arr: any[] = [];
-    for (let i = len1.startIndex; i < len1.endIndex; i++) {
-      arr[i] = Array2D(len2, len3, fill);
-    }
-    return arr;
+export function Array3D<T>(arr: T[][][] | null, len1: IndexRange, len2: IndexRange, len3?: IndexRange, fill?: T): T[][][] {
+  if (arr == null) {
+    arr = [];
   }
+
+  if (typeof len1 == "number") {
+    for (let i = 0; i < len1; i++) {
+      arr[i] = Array2D(arr[i], len2, len3, fill);
+    }
+  } else {
+    for (let i = len1.begin; i < len1.end; i++) {
+      arr[i] = Array2D(arr[i], len2, len3, fill);
+    }
+  }
+  return arr;
 }
 
-export function Array4D(len1: IndexRange, len2: IndexRange, len3: IndexRange, len4?: IndexRange, fill?: any) {
-  if (typeof len1 == "number") {
-    return Array.from({ length: len1 }, (item) => Array3D(len2, len3, len4, fill));
-  } else {
-    let arr: any[] = [];
-    for (let i = len1.startIndex; i < len1.endIndex; i++) {
-      arr[i] = Array3D(len2, len3, len4, fill);
-    }
-    return arr;
+export function Array4D<T>(arr: T[][][][] | null, len1: IndexRange, len2: IndexRange, len3: IndexRange, len4?: IndexRange, fill?: T): T[][][][] {
+  if (arr == null) {
+    arr = [];
   }
+
+  if (typeof len1 == "number") {
+    for (let i = 0; i < len1; i++) {
+      arr[i] = Array3D(arr[i], len2, len3, len4, fill);
+    }
+  } else {
+    for (let i = len1.begin; i < len1.end; i++) {
+      arr[i] = Array3D(arr[i], len2, len3, len4, fill);
+    }
+  }
+  return arr;
 }
 
-export function Array5D(len1: IndexRange, len2: IndexRange, len3: IndexRange, len4: IndexRange, len5?: IndexRange, fill?: any) {
-  if (typeof len1 == "number") {
-    return Array.from({ length: len1 }, (item) => Array4D(len2, len3, len4, len5, fill));
-  } else {
-    let arr: any[] = [];
-    for (let i = len1.startIndex; i < len1.endIndex; i++) {
-      arr[i] = Array4D(len2, len3, len4, len5, fill);
-    }
-    return arr;
+export function Array5D<T>(arr: T[][][][][] | null, len1: IndexRange, len2: IndexRange, len3: IndexRange, len4: IndexRange, len5?: IndexRange, fill?: T): T[][][][][] {
+  if (arr == null) {
+    arr = [];
   }
+
+  if (typeof len1 == "number") {
+    for (let i = 0; i < len1; i++) {
+      arr[i] = Array4D(arr[i], len2, len3, len4, len5, fill);
+    }
+  } else {
+    for (let i = len1.begin; i < len1.end; i++) {
+      arr[i] = Array4D(arr[i], len2, len3, len4, len5, fill);
+    }
+  }
+  return arr;
 }
 
 export function clone<T>(data: T): T {

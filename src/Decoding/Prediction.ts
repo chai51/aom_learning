@@ -81,53 +81,28 @@ const WEDGE_OBLIQUE153 = 5;
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#prediction-processes)
  */
 export class Prediction {
-  CurrFrame: number[][][];
-  private AboveRow: number[];
-  private LeftCol: number[];
-  private LocalValid: number;
-  private LocalWarpParams: number[];
-  private InterPostRound: number;
-  private FwdWeight: number;
-  private BckWeight: number;
-  InterRound0: number;
-  InterRound1: number;
-  private Mask: number[][];
-  private WedgeMasks: number[][][][][];
+  CurrFrame: number[][][] = [];
+  private AboveRow: number[] = [];
+  private LeftCol: number[] = [];
+  private LocalValid!: number;
+  private LocalWarpParams: number[] = [];
+  private InterPostRound!: number;
+  private FwdWeight!: number;
+  private BckWeight!: number;
+  InterRound0!: number;
+  InterRound1!: number;
+  private Mask: number[][] = [];
+  private WedgeMasks: number[][][][][] = [];
 
-  private init: boolean;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
-
-    this.CurrFrame = [];
-    this.AboveRow = [];
-    this.LeftCol = [];
-    this.LocalValid = undefined as any;
-    this.LocalWarpParams = [];
-    this.InterPostRound = undefined as any;
-    this.FwdWeight = undefined as any;
-    this.BckWeight = undefined as any;
-    this.InterRound0 = undefined as any;
-    this.InterRound1 = undefined as any;
-    this.Mask = Array2D(64);
-    this.WedgeMasks = Array5D(64, 64, 64, 64);
     this.initialise_wedge_mask_table();
 
     this.decoder = d;
   }
 
-  initialize() {
-    if (this.init) {
-      return;
-    }
-    this.init = true;
-
-    const maxHeight = this.decoder.sequenceHeaderObu.sequenceHeader.max_frame_height_minus_1 + 1;
-    const plane = 3;
-
-    this.CurrFrame = Array3D(plane, { startIndex: -64, endIndex: maxHeight });
-  }
+  initialize() {}
 
   /**
    * 7.11.2 Intra prediction process
@@ -211,6 +186,7 @@ export class Prediction {
     /**
      * 解码帧
      */
+    this.CurrFrame = Array3D(this.CurrFrame, 3, y + h);
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
         this.CurrFrame[plane][y + i][x + j] = pred[i][j];
@@ -255,7 +231,7 @@ export class Prediction {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const fimi = tg.filter_intra_mode_info;
 
-    let pred: number[][] = Array2D(h);
+    let pred = Array2D<number>(null, h);
 
     let w4 = w >> 2;
     let h2 = h >> 1;
@@ -364,7 +340,7 @@ export class Prediction {
     } else if (pAngle > 90 && pAngle < 180) {
       dx = Dr_Intra_Derivative[180 - pAngle];
     } else {
-      dx = undefined as any;
+      dx = null as any;
     }
 
     let dy: number;
@@ -373,7 +349,7 @@ export class Prediction {
     } else if (pAngle > 180) {
       dy = Dr_Intra_Derivative[270 - pAngle];
     } else {
-      dy = undefined as any;
+      dy = null as any;
     }
 
     if (pAngle < 90) {
@@ -440,7 +416,7 @@ export class Prediction {
     const seqHeader = this.decoder.sequenceHeaderObu.sequenceHeader;
     const cc = seqHeader.color_config;
 
-    let pred: number[][] = Array2D(h);
+    let pred = Array2D<number>(null, h);
 
     if (haveLeft == 1 && haveAbove == 1) {
       let sum = 0;
@@ -497,7 +473,7 @@ export class Prediction {
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#smooth-intra-prediction-process)
    */
   smooth_intra_prediction_process(mode: number, log2W: number, log2H: number, w: number, h: number) {
-    let pred: number[][] = Array2D(h);
+    let pred = Array2D<number>(null, h);
 
     if (mode == Y_MODE.SMOOTH_PRED) {
       let smWeightsX: any;
@@ -840,7 +816,7 @@ export class Prediction {
     // 4.
     let refList = 0;
 
-    let preds = Array3D(2, h);
+    let preds = Array3D<number>(null, 2, h);
     while (true) {
       // 5.
       let refFrame = db.RefFrames[candRow][candCol][refList];
@@ -895,7 +871,7 @@ export class Prediction {
 
       // 12.
       if (useWarp != 0) {
-        let pred = Array2D(Math.ceil(h / 8) * 8);
+        let pred = Array2D<number>(null, Math.ceil(h / 8) * 8);
         for (let i8 = 0; i8 <= (h - 1) >> 3; i8++) {
           for (let j8 = 0; j8 <= (w - 1) >> 3; j8++) {
             this.block_warp(useWarp, plane, refList, x, y, i8, j8, w, h, { pred });
@@ -933,6 +909,7 @@ export class Prediction {
     }
 
     if (isCompound == 0 && rii.IsInterIntra == 0) {
+      this.CurrFrame = Array3D(this.CurrFrame, 3, y + h);
       for (let i = 0; i < h; i++) {
         for (let j = 0; j < w; j++) {
           this.CurrFrame[plane][y + i][x + j] = Clip1(preds[0][i][j], cc.BitDepth);
@@ -1060,7 +1037,7 @@ export class Prediction {
         interpFilter = 5;
       }
     }
-    let intermediate = Array2D(intermediateHeight);
+    let intermediate = Array2D<number>(null, intermediateHeight);
     for (let r = 0; r < intermediateHeight; r++) {
       for (let c = 0; c < w; c++) {
         let s = 0;
@@ -1082,7 +1059,7 @@ export class Prediction {
         interpFilter = 5;
       }
     }
-    let pred = Array2D(h);
+    let pred = Array2D<number>(null, h);
     for (let r = 0; r < h; r++) {
       for (let c = 0; c < w; c++) {
         let s = 0;
@@ -1145,7 +1122,7 @@ export class Prediction {
     let iy4 = y4 >> WARPEDMODEL_PREC_BITS;
     let sy4 = y4 & ((1 << WARPEDMODEL_PREC_BITS) - 1);
 
-    let intermediate = Array2D(15);
+    let intermediate = Array2D<number>(null, 15);
     for (let i1 = -7; i1 < 8; i1++) {
       for (let i2 = -4; i2 < 4; i2++) {
         let sx = sx4 + alpha * i2 + beta * i1;
@@ -1264,9 +1241,9 @@ export class Prediction {
     const m = tg.mv;
     const mvp = this.decoder.motionVectorPrediction;
 
-    let A = Array2D(2, 2, 0);
-    let Bx = Array1D(2, 0);
-    let By = Array1D(2, 0);
+    let A = Array2D<number>(null, 2, 2, 0);
+    let Bx = Array1D<number>(null, 2, 0);
+    let By = Array1D<number>(null, 2, 0);
 
     let w4 = Num_4x4_Blocks_Wide[db.MiSize];
     let h4 = Num_4x4_Blocks_High[db.MiSize];
@@ -1554,6 +1531,7 @@ export class Prediction {
     const rii = tg.inter_intra;
     const rct = tg.compound_type;
 
+    this.Mask = Array2D(this.Mask, h);
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
         this.Mask[i][j] = this.WedgeMasks[db.MiSize][rct.wedge_sign][rii.wedge_index][i][j];
@@ -1582,7 +1560,7 @@ export class Prediction {
 
     let w = MASK_MASTER_SIZE;
     let h = MASK_MASTER_SIZE;
-    const MasterMask = Array3D(7, MASK_MASTER_SIZE);
+    const MasterMask = Array3D<number>(null, 7, MASK_MASTER_SIZE);
     for (let j = 0; j < w; j++) {
       let shift = MASK_MASTER_SIZE / 4;
       for (let i = 0; i < h; i += 2) {
@@ -1602,6 +1580,7 @@ export class Prediction {
         MasterMask[WEDGE_HORIZONTAL][j][i] = MasterMask[WEDGE_VERTICAL][i][j];
       }
     }
+    Array5D(this.WedgeMasks, BLOCK_SIZES, 2, WEDGE_TYPES, MASK_MASTER_SIZE, 128);
     for (let bsize = SUB_SIZE.BLOCK_8X8; bsize < BLOCK_SIZES; bsize++) {
       if (Wedge_Bits[bsize] > 0) {
         w = Block_Width[bsize];
@@ -1618,10 +1597,10 @@ export class Prediction {
             sum += MasterMask[dir][yoff + i][xoff];
           }
           let avg = integer((sum + integer((w + h - 1) / 2)) / (w + h - 1));
-          let flipSign = Number(avg < 32);
+          let flipSign = avg < 32;
           for (let i = 0; i < h; i++) {
             for (let j = 0; j < w; j++) {
-              this.WedgeMasks[bsize][flipSign][wedge][i][j] = MasterMask[dir][yoff + i][xoff + j];
+              this.WedgeMasks[bsize][Number(flipSign)][wedge][i][j] = MasterMask[dir][yoff + i][xoff + j];
               this.WedgeMasks[bsize][Number(!flipSign)][wedge][i][j] = 64 - MasterMask[dir][yoff + i][xoff + j];
             }
           }
@@ -1685,6 +1664,7 @@ export class Prediction {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const rct = tg.compound_type;
 
+    this.Mask = Array2D(this.Mask, h);
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
         let diff = Math.abs(preds[0][i][j] - preds[1][i][j]);
@@ -1716,6 +1696,7 @@ export class Prediction {
     ];
 
     let sizeScale = integer(MAX_SB_SIZE / Math.max(h, w));
+    this.Mask = Array2D(this.Mask, h);
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
         if (rii.interintra_mode == INTERINTRA_MODE.II_V_PRED) {
@@ -1895,7 +1876,7 @@ export class Prediction {
     }
 
     let lumaAvg = 0;
-    let L = Array2D(h);
+    let L = Array2D<number>(null, h);
     for (let i = 0; i < h; i++) {
       let lumaY = (startY + i) << subY;
       lumaY = Math.min(lumaY, tb.MaxLumaH - (1 << subY));

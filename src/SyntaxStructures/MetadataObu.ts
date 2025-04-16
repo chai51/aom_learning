@@ -1,4 +1,3 @@
-import { Array2D } from "../Conventions";
 import { AV1Decoder } from "./Obu";
 import { METADATA_TYPE, SCALABILITY_MODE_IDC } from "./Semantics";
 
@@ -28,7 +27,6 @@ export class MetadataObu {
         temporal_group_temporal_switching_up_point_flag: [],
         temporal_group_spatial_switching_up_point_flag: [],
         temporal_group_ref_cnt: [],
-        temporal_group_ref_pic_diff: Array2D(255),
       },
       metadata_timecode: {},
     } as any;

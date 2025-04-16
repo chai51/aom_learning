@@ -87,9 +87,6 @@ export class Obu extends EventEmitter {
   frame_unit(buf: Buffer, sz: number) {
     const reader = this.decoder.reader;
     const obu = this.decoder.obu;
-    const fho = this.decoder.frameHeaderObu;
-    const fh = fho.frameHeader;
-    const p = this.decoder.prediction;
 
     reader.initialize(buf);
     while (sz > 0) {

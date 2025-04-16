@@ -13,45 +13,29 @@ import { IDENTITY, LEAST_SQUARES_SAMPLES_MAX, MAX_REF_MV_STACK_SIZE, MI_SIZE, MV
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#motion-vector-prediction-processes)
  */
 export class MotionVectorPrediction {
-  NumMvFound: number = undefined as any;
-  private NewMvCount: number = undefined as any;
-  RefStackMv: number[][][] = Array3D(32, 2);
-  GlobalMvs: number[][] = Array2D(2);
-  private FoundMatch: number;
-  private CloseMatches: number;
-  private WeightStack: number[];
-  ZeroMvContext: number;
-  NumSamples: number;
-  private NumSamplesScanned: number;
-  private TotalMatches: number;
-  private RefIdCount: number[];
-  private RefDiffCount: number[];
-  private RefIdMvs: number[][][];
-  private RefDiffMvs: number[][][];
-  DrlCtxStack: number[];
-  NewMvContext: number;
-  RefMvContext: number;
-  CandList: number[][];
+  NumMvFound!: number;
+  private NewMvCount!: number;
+  RefStackMv: number[][][] = [];
+  GlobalMvs: number[][] = [];
+  private FoundMatch!: number;
+  private CloseMatches!: number;
+  private WeightStack: number[] = [];
+  ZeroMvContext!: number;
+  NumSamples!: number;
+  private NumSamplesScanned!: number;
+  private TotalMatches!: number;
+  private RefIdCount: number[] = [];
+  private RefDiffCount: number[] = [];
+  private RefIdMvs: number[][][] = [];
+  private RefDiffMvs: number[][][] = [];
+  DrlCtxStack: number[] = [];
+  NewMvContext!: number;
+  RefMvContext!: number;
+  CandList: number[][] = [];
 
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.FoundMatch = undefined as any;
-    this.CloseMatches = undefined as any;
-    this.WeightStack = [];
-    this.ZeroMvContext = undefined as any;
-    this.NumSamples = undefined as any;
-    this.NumSamplesScanned = undefined as any;
-    this.TotalMatches = undefined as any;
-    this.RefIdCount = [];
-    this.RefDiffCount = [];
-    this.RefIdMvs = Array3D(2, 32);
-    this.RefDiffMvs = Array3D(2, 32);
-    this.DrlCtxStack = [];
-    this.NewMvContext = undefined as any;
-    this.RefMvContext = undefined as any;
-    this.CandList = Array2D(32);
-
     this.decoder = d;
   }
 
@@ -635,6 +619,7 @@ export class MotionVectorPrediction {
     }
     if (idx == this.NumMvFound && this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
       // a.
+      this.RefStackMv = Array3D(this.RefStackMv, this.NumMvFound + 1, 2);
       this.RefStackMv[this.NumMvFound][0] = candMv;
 
       // b.
@@ -814,7 +799,7 @@ export class MotionVectorPrediction {
     }
 
     if (isCompound == 1) {
-      let combinedMvs: number[][][] = Array3D(2, 2);
+      let combinedMvs = Array3D<number>(null, 2, 2);
       for (let list = 0; list < 2; list++) {
         let compCount = 0;
         for (let idx = 0; idx < this.RefIdCount[list]; idx++) {
@@ -849,6 +834,7 @@ export class MotionVectorPrediction {
         }
       }
     } else {
+      this.RefStackMv = Array3D(this.RefStackMv, 2, 1);
       for (let idx = this.NumMvFound; idx < 2; idx++) {
         this.RefStackMv[idx][0] = clone(this.GlobalMvs[0]);
       }
@@ -867,6 +853,8 @@ export class MotionVectorPrediction {
     const rf = tg.ref_frames;
 
     if (isCompound) {
+      this.RefIdMvs = Array3D(this.RefIdMvs, 2, 1);
+      this.RefDiffMvs = Array3D(this.RefDiffMvs, 2, 1);
       for (let candList = 0; candList < 2; candList++) {
         let candRef = db.RefFrames[mvRow][mvCol][candList];
         if (candRef > REF_FRAME.INTRA_FRAME) {
@@ -1121,6 +1109,7 @@ export class MotionVectorPrediction {
     }
 
     // 3.
+    this.CandList = Array2D(this.CandList, this.NumSamples + 1);
     for (let j = 0; j <= 3; j++) {
       this.CandList[this.NumSamples][j] = cand[j];
     }

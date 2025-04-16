@@ -1,4 +1,4 @@
-import { Array2D, Clip1, Clip3, integer, Round2 } from "../Conventions";
+import { Clip1, Clip3, integer, Round2 } from "../Conventions";
 import { AV1Decoder } from "../SyntaxStructures/Obu";
 
 import { TX_SIZE } from "../SyntaxStructures/Semantics";
@@ -14,13 +14,11 @@ import { ADST_FLIPADST, DCT_FLIPADST, FLIPADST_ADST, FLIPADST_DCT, FLIPADST_FLIP
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#reconstruction-and-dequantization)
  */
 export class ReconstructionAndDequantization {
-  Dequant: number[][];
+  Dequant: number[][] = [];
 
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.Dequant = Array2D(64);
-
     this.decoder = d;
   }
 

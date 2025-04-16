@@ -101,7 +101,39 @@ import {
   Default_Y_Mode_Cdf,
   Default_Zero_Mv_Cdf,
 } from "../AdditionalTables/DefaultCdfTables";
-import { AFFINE, FRAME_LF_COUNT, GM_ABS_ALPHA_BITS, GM_ABS_TRANS_BITS, GM_ABS_TRANS_ONLY_BITS, GM_ALPHA_PREC_BITS, GM_TRANS_ONLY_PREC_BITS, GM_TRANS_PREC_BITS, IDENTITY, MAX_LOOP_FILTER, MAX_SEGMENTS, MAX_TILE_AREA, MAX_TILE_COLS, MAX_TILE_ROWS, MAX_TILE_WIDTH, MV_CONTEXTS, NUM_REF_FRAMES, PRIMARY_REF_NONE, REFS_PER_FRAME, RESTORATION_TILESIZE_MAX, ROTZOOM, SEG_LVL_MAX, SEG_LVL_REF_FRAME, SELECT_INTEGER_MV, SELECT_SCREEN_CONTENT_TOOLS, SUPERRES_DENOM_BITS, SUPERRES_DENOM_MIN, SUPERRES_NUM, TOTAL_REFS_PER_FRAME, TRANSLATION, WARPEDMODEL_PREC_BITS } from "../define";
+import {
+  AFFINE,
+  FRAME_LF_COUNT,
+  GM_ABS_ALPHA_BITS,
+  GM_ABS_TRANS_BITS,
+  GM_ABS_TRANS_ONLY_BITS,
+  GM_ALPHA_PREC_BITS,
+  GM_TRANS_ONLY_PREC_BITS,
+  GM_TRANS_PREC_BITS,
+  IDENTITY,
+  MAX_LOOP_FILTER,
+  MAX_SEGMENTS,
+  MAX_TILE_AREA,
+  MAX_TILE_COLS,
+  MAX_TILE_ROWS,
+  MAX_TILE_WIDTH,
+  MV_CONTEXTS,
+  NUM_REF_FRAMES,
+  PRIMARY_REF_NONE,
+  REFS_PER_FRAME,
+  RESTORATION_TILESIZE_MAX,
+  ROTZOOM,
+  SEG_LVL_MAX,
+  SEG_LVL_REF_FRAME,
+  SELECT_INTEGER_MV,
+  SELECT_SCREEN_CONTENT_TOOLS,
+  SUPERRES_DENOM_BITS,
+  SUPERRES_DENOM_MIN,
+  SUPERRES_NUM,
+  TOTAL_REFS_PER_FRAME,
+  TRANSLATION,
+  WARPEDMODEL_PREC_BITS,
+} from "../define";
 
 /**
  * 5.9 Frame header OBU syntax
@@ -131,7 +163,18 @@ export class FrameHeaderObu {
       OrderHints: [],
       RefOrderHint: [],
       LosslessArray: [],
-      SegQMLevel: [],
+      non_coeff_cdfs: {
+        MvJointCdf: [],
+        MvClassCdf: [],
+        MvFrCdf: [],
+        MvClass0FrCdf: [],
+        DeltaLFMultiCdf: [],
+      },
+      coeff_cdfs: {},
+      previous_segment_ids: {
+        RefMiCols: [],
+        RefMiRows: [],
+      },
       reference_frame_marking: {
         RefValid: [],
       },
@@ -147,16 +190,16 @@ export class FrameHeaderObu {
         loop_filter_mode_deltas: [],
       },
       quantization_params: {},
-      segmentation_params: {
-        FeatureEnabled: Array2D(MAX_SEGMENTS),
-        FeatureData: Array2D(MAX_SEGMENTS),
-      },
+      segmentation_params: {},
       tile_info: {
         MiColStarts: [],
         MiRowStarts: [],
       },
       delta_q_params: {},
       delta_lf_params: {},
+      global_motion_params: {
+        GmType: [],
+      },
       film_grain_params: {
         point_y_value: [],
         point_y_scaling: [],
@@ -173,33 +216,9 @@ export class FrameHeaderObu {
         SkipModeFrame: [],
       },
       frame_reference_mode: {},
-      global_motion_params: {
-        gm_params: Array2D(NUM_REF_FRAMES),
-        GmType: [],
-      },
       temporal_point_info: {},
-      past_independence: {
-        PrevGmParams: Array2D(NUM_REF_FRAMES),
-      },
-      non_coeff_cdfs: {
-        MvJointCdf: [],
-        MvClassCdf: [],
-        MvClass0BitCdf: Array2D(MV_CONTEXTS),
-        MvFrCdf: [],
-        MvClass0FrCdf: [],
-        MvClass0HpCdf: Array2D(MV_CONTEXTS),
-        MvSignCdf: Array2D(MV_CONTEXTS),
-        MvBitCdf: Array2D(MV_CONTEXTS),
-        MvHpCdf: Array2D(MV_CONTEXTS),
-        DeltaLFMultiCdf: [],
-      },
-      coeff_cdfs: {},
-      previous_segment_ids: {
-        PrevGmParams: Array2D(NUM_REF_FRAMES),
-        RefMiCols: [],
-        RefMiRows: [],
-        SavedGmParams: Array3D(NUM_REF_FRAMES, NUM_REF_FRAMES),
-      },
+      Saved_non_coeff_cdfs: {},
+      Saved_coeff_cdfs: {},
       ref_frames: {
         RefFrameType: [],
         RefFrameWidth: [],
@@ -1348,6 +1367,7 @@ export class FrameHeaderObu {
     const fh = this.frameHeader;
     const gmp = this.frameHeader.global_motion_params;
 
+    gmp.gm_params = Array2D(gmp.gm_params, REF_FRAME.ALTREF_FRAME + 1);
     for (let ref = REF_FRAME.LAST_FRAME; ref <= REF_FRAME.ALTREF_FRAME; ref++) {
       gmp.GmType[ref] = IDENTITY;
       for (let i = 0; i < 6; i++) {
@@ -1633,20 +1653,13 @@ export class FrameHeaderObu {
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#uncompressed-header-semantics)
    */
   setup_past_independence() {
-    const cis = this.frameHeader.compute_image_size;
     const lfp = this.frameHeader.loop_filter_params;
     const sp = this.frameHeader.segmentation_params;
     const psi = this.frameHeader.previous_segment_ids;
-    const tg = this.decoder.tileGroupObu.titleGroup;
-    const db = tg.decode_block;
 
-    for (let i = 0; i < MAX_SEGMENTS; i++) {
-      for (let j = 0; j < SEG_LVL_MAX; j++) {
-        sp.FeatureData[i][j] = 0;
-        sp.FeatureEnabled[i][j] = 0;
-      }
-    }
-    db.PrevSegmentIds = Array2D(cis.MiRows, cis.MiCols, 0);
+    sp.FeatureData = Array2D(null, MAX_SEGMENTS, SEG_LVL_MAX, 0);
+    sp.FeatureEnabled = Array2D(null, MAX_SEGMENTS, SEG_LVL_MAX, 0);
+    psi.PrevGmParams = Array2D(psi.PrevGmParams, REF_FRAME.ALTREF_FRAME + 1);
     for (let ref = REF_FRAME.LAST_FRAME; ref <= REF_FRAME.ALTREF_FRAME; ref++) {
       for (let i = 0; i <= 5; i++) {
         psi.PrevGmParams[ref][i] = i % 3 == 2 ? 1 << WARPEDMODEL_PREC_BITS : 0;
@@ -1708,6 +1721,11 @@ export class FrameHeaderObu {
     ncc.CompBwdRefCdf = inverseCdf(Default_Comp_Bwd_Ref_Cdf);
     ncc.SingleRefCdf = inverseCdf(Default_Single_Ref_Cdf);
 
+    ncc.MvClass0BitCdf = Array3D(ncc.MvClass0BitCdf, MV_CONTEXTS, 2);
+    ncc.MvClass0HpCdf = Array3D(ncc.MvClass0HpCdf, MV_CONTEXTS, 2);
+    ncc.MvSignCdf = Array3D(ncc.MvSignCdf, MV_CONTEXTS, 2);
+    ncc.MvBitCdf = Array3D(ncc.MvBitCdf, MV_CONTEXTS, 2);
+    ncc.MvHpCdf = Array3D(ncc.MvHpCdf, MV_CONTEXTS, 2);
     for (let i = 0; i < MV_CONTEXTS; i++) {
       ncc.MvJointCdf[i] = inverseCdf(Default_Mv_Joint_Cdf);
     }
@@ -1878,6 +1896,7 @@ export class FrameHeaderObu {
         }
       }
     } else {
+      db.PrevSegmentIds = Array2D(db.PrevSegmentIds, cis.MiRows);
       for (let row = 0; row < cis.MiRows; row++) {
         for (let col = 0; col < cis.MiCols; col++) {
           db.PrevSegmentIds[row][col] = 0;
@@ -2004,8 +2023,8 @@ export class FrameHeaderObu {
   save_segmentation_params(i: number) {
     const sp = this.frameHeader.segmentation_params;
 
-    let FeatureEnabled = Array2D(MAX_SEGMENTS);
-    let FeatureData = Array2D(MAX_SEGMENTS);
+    let FeatureEnabled = Array2D<number>(null, MAX_SEGMENTS);
+    let FeatureData = Array2D<number>(null, MAX_SEGMENTS);
     for (let j = 0; j < MAX_SEGMENTS; j++) {
       for (let k = 0; k < SEG_LVL_MAX; k++) {
         FeatureEnabled[j][k] = sp.FeatureEnabled[j][k];
@@ -2384,7 +2403,6 @@ export class FrameObu {
     this.decoder.tileGroupObu.tile_group_obu(sz);
   }
 }
-
 
 const Segmentation_Feature_Bits = [8, 6, 6, 6, 6, 3, 0, 0];
 const Segmentation_Feature_Signed = [1, 1, 1, 1, 1, 0, 0, 0];

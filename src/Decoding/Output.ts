@@ -11,54 +11,32 @@ import { Gaussian_Sequence } from "../AdditionalTables/ConversionTables";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#loop-restoration-process)
  */
 export class Output {
-  private RandomRegister: number;
-  private GrainCenter: number;
-  private GrainMin: number;
-  private GrainMax: number;
-  private LumaGrain: number[][];
-  private CbGrain: number[][];
-  private CrGrain: number[][];
-  private ScalingLut: number[][];
-  private ScalingShift: number;
+  private RandomRegister!: number;
+  private GrainCenter!: number;
+  private GrainMin!: number;
+  private GrainMax!: number;
+  private LumaGrain: number[][] = [];
+  private CbGrain: number[][] = [];
+  private CrGrain: number[][] = [];
+  private ScalingLut: number[][] = [];
+  private ScalingShift!: number;
   cameraTile: {
     OutY: number[][];
     OutU: number[][];
     OutV: number[][];
-  } = undefined as any;
+  } = {
+    OutY: [],
+    OutU: [],
+    OutV: [],
+  };
 
-  private init: boolean;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
-
-    this.RandomRegister = undefined as any;
-    this.GrainCenter = undefined as any;
-    this.GrainMin = undefined as any;
-    this.GrainMax = undefined as any;
-    this.LumaGrain = Array2D(73);
-    this.CbGrain = Array2D(73);
-    this.CrGrain = Array2D(73);
-    this.ScalingLut = Array2D(3);
-    this.ScalingShift = undefined as any;
-
     this.decoder = d;
   }
 
-  initialize() {
-    if (this.init) {
-      return;
-    }
-    this.init = true;
-
-    const fh = this.decoder.frameHeaderObu.frameHeader;
-    const fs = fh.frame_size;
-    this.cameraTile = {
-      OutY: Array2D(fs.FrameHeight),
-      OutU: Array2D(fs.FrameHeight),
-      OutV: Array2D(fs.FrameHeight),
-    };
-  }
+  initialize() {}
 
   /**
    * 7.18.1 General
@@ -138,18 +116,21 @@ export class Output {
       let subX = cc.subsampling_x;
       let subY = cc.subsampling_y;
 
+      ct.OutY = Array2D(ct.OutY, h);
       for (let x = 0; x < w; x++) {
         for (let y = 0; y < h; y++) {
           ct.OutY[y][x] = lr.LrFrame[0][y][x];
         }
       }
 
+      ct.OutU = Array2D(ct.OutU, (h + subY) >> subY);
       for (let x = 0; x < (w + subX) >> subX; x++) {
         for (let y = 0; y < (h + subY) >> subY; y++) {
           ct.OutU[y][x] = lr.LrFrame[1][y][x];
         }
       }
 
+      ct.OutV = Array2D(ct.OutV, (h + subY) >> subY);
       for (let x = 0; x < (w + subX) >> subX; x++) {
         for (let y = 0; y < (h + subY) >> subY; y++) {
           ct.OutV[y][x] = lr.LrFrame[2][y][x];
@@ -213,6 +194,7 @@ export class Output {
     const fgp = fh.film_grain_params;
 
     let shift = 12 - cc.BitDepth + fgp.grain_scale_shift;
+    this.LumaGrain = Array2D(this.LumaGrain, 73);
     for (let y = 0; y < 73; y++) {
       for (let x = 0; x < 82; x++) {
         let g = 0;
@@ -247,6 +229,7 @@ export class Output {
 
     shift = 12 - cc.BitDepth + fgp.grain_scale_shift;
     this.RandomRegister = fgp.grain_seed ^ 0xb524;
+    this.CbGrain = Array2D(this.CbGrain, chromaH);
     for (let y = 0; y < chromaH; y++) {
       for (let x = 0; x < chromaW; x++) {
         let g = 0;
@@ -257,6 +240,7 @@ export class Output {
       }
     }
     this.RandomRegister = fgp.grain_seed ^ 0x49d8;
+    this.CrGrain = Array2D(this.CrGrain, chromaH);
     for (let y = 0; y < chromaH; y++) {
       for (let x = 0; x < chromaW; x++) {
         let g = 0;
@@ -314,6 +298,7 @@ export class Output {
     const fh = this.decoder.frameHeaderObu.frameHeader;
     const fgp = fh.film_grain_params;
 
+    this.ScalingLut = Array2D(this.ScalingLut, cc.NumPlanes);
     for (let plane = 0; plane < cc.NumPlanes; plane++) {
       let numPoints = fgp.num_cr_points;
       if (plane == 0 || fgp.chroma_scaling_from_luma) {
@@ -395,7 +380,7 @@ export class Output {
     const ct = this.cameraTile;
 
     let lumaNum = 0;
-    let noiseStripe = Array4D(64, cc.NumPlanes, 64);
+    let noiseStripe = Array4D<number>(null, 64, cc.NumPlanes, 64);
     for (let y = 0; y < (h + 1) / 2; y += 16) {
       this.RandomRegister = fgp.grain_seed;
       this.RandomRegister ^= ((lumaNum * 37 + 178) & 255) << 8;
@@ -445,7 +430,7 @@ export class Output {
       lumaNum++;
     }
 
-    let noiseImage = Array3D(cc.NumPlanes, h);
+    let noiseImage = Array3D<number>(null, cc.NumPlanes, h);
     for (let plane = 0; plane < cc.NumPlanes; plane++) {
       let planeSubX = plane > 0 ? subX : 0;
       let planeSubY = plane > 0 ? subY : 0;

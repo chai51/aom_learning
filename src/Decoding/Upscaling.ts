@@ -34,7 +34,7 @@ export class Upscaling {
       return frame;
     }
 
-    let outputFrame: number[][][] = Array3D(cc.NumPlanes, Round2(fs.FrameHeight, fswr.UpscaledWidth));
+    let outputFrame = Array3D<number>(null, cc.NumPlanes, Round2(fs.FrameHeight, fswr.UpscaledWidth));
     for (let plane = 0; plane < cc.NumPlanes; plane++) {
       let subX = 0;
       let subY = 0;

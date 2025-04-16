@@ -1,4 +1,4 @@
-import { Array2D, Array3D, Array4D, Array5D, CeilLog2, Clip1, Clip3, clone, integer, Round2 } from "../Conventions";
+import { Array1D, Array2D, Array3D, Array4D, Array5D, CeilLog2, Clip1, Clip3, clone, integer, Round2 } from "../Conventions";
 import { AV1Decoder } from "./Obu";
 
 import {
@@ -109,7 +109,6 @@ import {
   MI_SIZE_LOG2,
   MV_INTRABC_CONTEXT,
   NUM_BASE_LEVELS,
-  NUM_REF_FRAMES,
   PALETTE_COLORS,
   PALETTE_NUM_NEIGHBORS,
   REF_SCALE_SHIFT,
@@ -122,7 +121,6 @@ import {
   SUPERRES_NUM,
   TRANSLATION,
   TX_SIZES_ALL,
-  UNKNOWN_VALUE,
   V_ADST,
   V_DCT,
   V_FLIPADST,
@@ -140,100 +138,72 @@ const Max_Tx_Depth = [0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3
  */
 export class TileGroupObu {
   titleGroup: TileGroup;
-  private init: boolean;
+  private init: boolean = false;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
-    const plane = 3;
-    const pass = 2;
-    const sbSize = 64;
-
     this.titleGroup = {
-      NumTiles: UNKNOWN_VALUE,
-      tg_start: UNKNOWN_VALUE,
-      tg_end: UNKNOWN_VALUE,
-      MiRowStart: UNKNOWN_VALUE,
-      MiRowEnd: UNKNOWN_VALUE,
-      MiColStart: UNKNOWN_VALUE,
-      MiColEnd: UNKNOWN_VALUE,
-      CurrentQIndex: UNKNOWN_VALUE,
       decode_tile: {
         DeltaLF: [],
-        RefSgrXqd: Array2D(plane),
-        RefLrWiener: Array3D(plane, pass),
-      } as any,
-      block_decoded: {
-        BlockDecoded: Array3D(plane, { startIndex: -1, endIndex: sbSize }),
       },
-      decode_partition: {} as any,
-      decode_block: {} as any,
+      block_decoded: {},
+      decode_partition: {},
+      decode_block: {},
       intra_frame_mode_info: {
         LeftRefFrame: [],
         AboveRefFrame: [],
-      } as any,
+      },
       intra_segment_id: {
         AboveSegPredContext: [],
         LeftSegPredContext: [],
-      } as any,
-      segment_id: {} as any,
-      skip_mode: {} as any,
-      skip: {} as any,
+      },
+      segment_id: {},
+      skip_mode: {},
+      skip: {},
       cdef_params: {
         cdef_y_pri_strength: [],
         cdef_uv_pri_strength: [],
         cdef_y_sec_strength: [],
         cdef_uv_sec_strength: [],
-      } as any,
+      },
       lr_params: {
         FrameRestorationType: [],
         LoopRestorationSize: [],
-        LrWiener: Array5D(3, 64, 64, 2),
-        LrSgrSet: Array3D(2, 64),
-        LrSgrXqd: Array4D(2, 64, 64),
-      } as any,
-      tx_size: {} as any,
-      block_tx_size: {
-        InterTxSizes: Array2D(64),
       },
-      transform_type: {} as any,
-      is_inter: {} as any,
+      tx_size: {},
+      block_tx_size: {},
+      transform_type: {},
+      is_inter: {},
       inter_block_mode_info: {
         interp_filter: [],
-      } as any,
-      filter_intra_mode_info: {} as any,
+      },
+      filter_intra_mode_info: {},
       ref_frames: {
         RefFrame: [],
       },
-      motion_mode: {} as any,
-      inter_intra: {} as any,
-      compound_type: {} as any,
+      motion_mode: {},
+      inter_intra: {},
+      compound_type: {},
       mv: {
-        Mv: Array2D(2),
-        PredMv: Array2D(2),
-      } as any,
-      transform_block: {} as any,
+        PredMv: [],
+      },
+      transform_block: {},
       coefficients: {
         Quant: [],
-        AboveLevelContext: Array2D(plane),
-        LeftLevelContext: Array2D(plane),
-        AboveDcContext: Array2D(plane),
-        LeftDcContext: Array2D(plane),
-      } as any,
-      intra_angle_info: {} as any,
-      cfl_alphas: {} as any,
+      },
+      intra_angle_info: {},
+      cfl_alphas: {},
       palette_mode_info: {
         palette_colors_y: [],
         palette_colors_u: [],
         palette_colors_v: [],
-      } as any,
-      palette_tokens: {
-        ColorMapY: Array2D(64),
-        ColorMapUV: Array2D(64),
       },
-      palette_color_context: {} as any,
-      cdef: {} as any,
-    };
+      palette_tokens: {},
+      palette_color_context: {
+        ColorOrder: [],
+      },
+      cdef: {},
+    } as any;
 
     this.decoder = d;
   }
@@ -243,46 +213,6 @@ export class TileGroupObu {
       return;
     }
     this.init = true;
-
-    const maxHeight = this.decoder.frameHeaderObu.frameHeader.frame_size.FrameHeight;
-    const cis = this.decoder.frameHeaderObu.frameHeader.compute_image_size;
-    const tg = this.titleGroup;
-    const db = tg.decode_block;
-    const lp = tg.lr_params;
-    const bts = tg.block_tx_size;
-    const tb = tg.transform_block;
-    const coef = tg.coefficients;
-    const rc = tg.cdef;
-    const sbRows = cis.MiRows + 32;
-    const sbCols = cis.MiCols + 32;
-    const bh4 = Math.max(...Num_4x4_Blocks_High);
-    const bw4 = Math.max(...Num_4x4_Blocks_Wide);
-    const plane = 3;
-    const refList = 2;
-
-    db.YModes = Array2D(sbRows + bh4);
-    db.UVModes = Array2D(sbRows + bh4);
-    db.RefFrames = Array3D(sbRows + bh4, sbCols + bw4);
-    db.CompGroupIdxs = Array2D(sbRows + bh4);
-    db.CompoundIdxs = Array2D(sbRows + bh4);
-    db.InterpFilters = Array3D(sbRows + bh4, cis.MiCols + bw4);
-    db.Mvs = Array4D(sbRows + bh4, cis.MiCols + bw4, refList);
-    db.IsInters = Array2D(sbRows + bh4);
-    db.SkipModes = Array2D(sbRows + bh4);
-    db.Skips = Array2D(sbRows + bh4);
-    db.TxSizes = Array2D(sbRows + bh4);
-    db.MiSizes = Array2D(sbRows + bh4);
-    db.SegmentIds = Array2D(sbRows + bh4);
-    db.PaletteSizes = Array3D(plane, sbRows + bh4);
-    db.PaletteColors = Array4D(plane, sbRows + bh4, cis.MiCols + bw4);
-    db.DeltaLFs = Array3D(sbRows + bh4, cis.MiCols + bw4);
-    db.PaletteCache = [];
-    db.SavedSegmentIds = Array3D(NUM_REF_FRAMES, cis.MiRows);
-    lp.LrType = Array3D(plane, maxHeight);
-    bts.InterTxSizes = Array2D(sbRows + bh4);
-    tb.LoopfilterTxSizes = Array3D(plane, sbRows + bh4);
-    coef.TxTypes = Array2D(sbRows + bh4);
-    rc.cdef_idx = Array2D(sbRows + bh4);
   }
 
   /**
@@ -352,8 +282,9 @@ export class TileGroupObu {
       this.decode_tile();
       sd.exit_symbol();
     }
-    assert(tg.tg_end == tg.NumTiles - 1, "It is a requirement of bitstream conformance that the value of tg_end for the last tile group in each frame is equal to NumTiles - 1.");
+
     if (tg.tg_end == tg.NumTiles - 1) {
+      assert(tg.tg_end == tg.NumTiles - 1, "It is a requirement of bitstream conformance that the value of tg_end for the last tile group in each frame is equal to NumTiles - 1.");
       if (!fh.disable_frame_end_update_cdf) {
         fho.frame_end_update_cdf();
       }
@@ -374,11 +305,14 @@ export class TileGroupObu {
     const dqp = fh.delta_q_params;
     const tg = this.titleGroup;
     const dt = tg.decode_tile;
+    const rc = tg.cdef;
 
     this.clear_above_context();
     for (let i = 0; i < FRAME_LF_COUNT; i++) {
       dt.DeltaLF[i] = 0;
     }
+    dt.RefSgrXqd = Array2D(dt.RefSgrXqd, cc.NumPlanes);
+    dt.RefLrWiener = Array3D(dt.RefLrWiener, cc.NumPlanes, 2);
     for (let plane = 0; plane < cc.NumPlanes; plane++) {
       for (let pass = 0; pass < 2; pass++) {
         dt.RefSgrXqd[plane][pass] = Sgrproj_Xqd_Mid[pass];
@@ -389,6 +323,7 @@ export class TileGroupObu {
     }
     let sbSize = seqHeader.use_128x128_superblock ? SUB_SIZE.BLOCK_128X128 : SUB_SIZE.BLOCK_64X64;
     let sbSize4 = Num_4x4_Blocks_Wide[sbSize];
+    rc.cdef_idx = Array2D(rc.cdef_idx, tg.MiRowEnd + 16);
     for (let r = tg.MiRowStart; r < tg.MiRowEnd; r += sbSize4) {
       this.clear_left_context();
       for (let c = tg.MiColStart; c < tg.MiColEnd; c += sbSize4) {
@@ -412,6 +347,7 @@ export class TileGroupObu {
     const tg = this.titleGroup;
     const bd = tg.block_decoded;
 
+    bd.BlockDecoded = Array3D(bd.BlockDecoded, cc.NumPlanes, { begin: -1, end: sbSize4 + 1 });
     for (let plane = 0; plane < cc.NumPlanes; plane++) {
       let subX = plane > 0 ? cc.subsampling_x : 0;
       let subY = plane > 0 ? cc.subsampling_y : 0;
@@ -576,6 +512,13 @@ export class TileGroupObu {
       this.reset_block_context(bw4, bh4);
     }
     let isCompound = Number(rf.RefFrame[1] > REF_FRAME.INTRA_FRAME);
+    db.YModes = Array2D(db.YModes, r + bh4);
+    db.UVModes = Array2D(db.UVModes, r + bh4);
+    db.RefFrames = Array3D(db.RefFrames, r + bh4, c + bw4);
+    db.CompGroupIdxs = Array2D(db.CompGroupIdxs, r + bh4);
+    db.CompoundIdxs = Array2D(db.CompoundIdxs, r + bh4);
+    db.InterpFilters = Array3D(db.InterpFilters, r + bh4, c + bw4);
+    db.Mvs = Array4D(db.Mvs, r + bh4, c + bw4, 2);
     for (let y = 0; y < bh4; y++) {
       for (let x = 0; x < bw4; x++) {
         db.YModes[r + y][c + x] = ifmi.YMode;
@@ -601,6 +544,15 @@ export class TileGroupObu {
     }
     this.compute_prediction();
     this.residual();
+
+    db.IsInters = Array2D(db.IsInters, r + bh4);
+    db.SkipModes = Array2D(db.SkipModes, r + bh4);
+    db.Skips = Array2D(db.Skips, r + bh4);
+    db.TxSizes = Array2D(db.TxSizes, r + bh4);
+    db.MiSizes = Array2D(db.MiSizes, r + bh4);
+    db.SegmentIds = Array2D(db.SegmentIds, r + bh4);
+    db.PaletteSizes = Array3D(db.PaletteSizes, 2, r + bh4);
+    db.DeltaLFs = Array3D(db.DeltaLFs, r + bh4, c + bw4);
     for (let y = 0; y < bh4; y++) {
       for (let x = 0; x < bw4; x++) {
         db.IsInters[r + y][c + x] = ii.is_inter;
@@ -1031,6 +983,7 @@ export class TileGroupObu {
         }
     } else {
       this.read_tx_size(Number(!s.skip || !ii.is_inter));
+      bts.InterTxSizes = Array2D(bts.InterTxSizes, db.MiRow + bh4);
       for (let row = db.MiRow; row < db.MiRow + bh4; row++)
         for (let col = db.MiCol; col < db.MiCol + bw4; col++) {
           bts.InterTxSizes[row][col] = ts.TxSize;
@@ -1535,6 +1488,7 @@ export class TileGroupObu {
     const m = tg.mv;
     const mvp = this.decoder.motionVectorPrediction;
 
+    m.Mv = Array2D(m.Mv, 2);
     for (let i = 0; i < 1 + isCompound; i++) {
       let compMode: Y_MODE;
       if (ifmi.use_intrabc) {
@@ -1792,6 +1746,7 @@ export class TileGroupObu {
     if (mv_joint == MV_JOINT.MV_JOINT_HNZVZ || mv_joint == MV_JOINT.MV_JOINT_HNZVNZ) {
       diffMv[1] = this.read_mv_component(1);
     }
+    m.Mv = Array2D(m.Mv, ref + 1);
     m.Mv[ref][0] = m.PredMv[ref][0] + diffMv[0];
     m.Mv[ref][1] = m.PredMv[ref][1] + diffMv[1];
   }
@@ -2050,7 +2005,7 @@ export class TileGroupObu {
     if (this.decoder.obu.onPredFrame) {
       let w = 1 << Tx_Width_Log2[txSz];
       let h = 1 << Tx_Height_Log2[txSz];
-      let pred: number[][] = Array2D(h);
+      let pred = Array2D<number>(null, h);
       for (let i = 0; i < h; i++) {
         for (let j = 0; j < w; j++) {
           pred[i][j] = p.CurrFrame[plane][startY + i][startX + j];
@@ -2071,7 +2026,7 @@ export class TileGroupObu {
       let log2H = Tx_Height_Log2[txSz];
       let w = 1 << log2W;
       let h = 1 << log2H;
-      const frame = Array2D(h);
+      const frame = Array2D<number>(null, h);
       for (let i = 0; i < h; i++) {
         for (let j = 0; j < w; j++) {
           frame[i][j] = p.CurrFrame[plane][startY + i][startX + j];
@@ -2080,6 +2035,7 @@ export class TileGroupObu {
       this.decoder.obu.onResidualFrame(plane, startX, startY, frame);
     }
 
+    tb.LoopfilterTxSizes = Array3D(tb.LoopfilterTxSizes, 3, (row >> subY) + stepY);
     for (let i = 0; i < stepY; i++) {
       for (let j = 0; j < stepX; j++) {
         tb.LoopfilterTxSizes[plane][(row >> subY) + i][(col >> subX) + j] = txSz;
@@ -2194,13 +2150,9 @@ export class TileGroupObu {
     let txSzCtx = (Tx_Size_Sqr[txSz] + Tx_Size_Sqr_Up[txSz] + 1) >> 1;
     let ptype = Number(plane > 0);
     let segEob = txSz == TX_SIZE.TX_16X64 || txSz == TX_SIZE.TX_64X16 ? 512 : Math.min(1024, Tx_Width[txSz] * Tx_Height[txSz]);
-    for (let c: number = 0; c < segEob; c++) {
-      coef.Quant[c] = 0;
-    }
-    for (let i = 0; i < 64; i++)
-      for (let j = 0; j < 64; j++) {
-        rad.Dequant[i][j] = 0;
-      }
+    coef.Quant = Array1D(null, segEob, 0);
+    rad.Dequant = Array2D(null, 64, 64, 0);
+
     let eob = 0;
     let culLevel = 0;
     let dcCategory = 0;
@@ -2821,6 +2773,7 @@ export class TileGroupObu {
     } else {
       coef.TxType = DCT_DCT;
     }
+    coef.TxTypes = Array2D(coef.TxTypes, y4 + (Tx_Height[txSz] >> 2));
     for (let i = 0; i < Tx_Width[txSz] >> 2; i++) {
       for (let j = 0; j < Tx_Height[txSz] >> 2; j++) {
         coef.TxTypes[y4 + j][x4 + i] = coef.TxType;
@@ -3138,6 +3091,10 @@ export class TileGroupObu {
         }
         let unitColStart = integer((c * numerator + denominator - 1) / denominator);
         let unitColEnd = Math.min(unitCols, integer(((c + w) * numerator + denominator - 1) / denominator));
+        lp.LrType = Array3D(lp.LrType, cc.NumPlanes, unitRowEnd);
+        lp.LrWiener = Array5D(lp.LrWiener, cc.NumPlanes, unitRowEnd, unitColEnd, 2);
+        lp.LrSgrSet = Array3D(lp.LrSgrSet, cc.NumPlanes, unitRowEnd);
+        lp.LrSgrXqd = Array4D(lp.LrSgrXqd, cc.NumPlanes, unitRowEnd, unitColEnd);
         for (let unitRow = unitRowStart; unitRow < unitRowEnd; unitRow++) {
           for (let unitCol = unitColStart; unitCol < unitColEnd; unitCol++) {
             this.read_lr_unit(plane, unitRow, unitCol);
@@ -3285,13 +3242,9 @@ export class TileGroupObu {
     const isi = tg.intra_segment_id;
     const coef = tg.coefficients;
 
-    for (let plane = 0; plane <= 2; plane++) {
-      for (let i = 0; i < cis.MiRows; i++) {
-        coef.LeftLevelContext[plane][i] = 0;
-        coef.LeftDcContext[plane][i] = 0;
-        isi.LeftSegPredContext[i] = 0;
-      }
-    }
+    coef.LeftLevelContext = Array2D(null, 3, cis.MiRows, 0);
+    coef.LeftDcContext = Array2D(null, 3, cis.MiRows, 0);
+    isi.LeftSegPredContext = Array1D(null, cis.MiRows, 0);
   }
 
   /**
@@ -3306,13 +3259,9 @@ export class TileGroupObu {
     const isi = tg.intra_segment_id;
     const coef = tg.coefficients;
 
-    for (let plane = 0; plane <= 2; plane++) {
-      for (let i = 0; i < cis.MiCols; i++) {
-        coef.AboveLevelContext[plane][i] = 0;
-        coef.AboveDcContext[plane][i] = 0;
-        isi.AboveSegPredContext[i] = 0;
-      }
-    }
+    coef.AboveLevelContext = Array2D(null, 3, cis.MiCols, 0);
+    coef.AboveDcContext = Array2D(null, 3, cis.MiCols, 0);
+    isi.AboveSegPredContext = Array1D(null, cis.MiCols, 0);
   }
 
   /**

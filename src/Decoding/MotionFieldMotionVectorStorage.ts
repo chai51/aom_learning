@@ -10,34 +10,16 @@ import { REF_FRAME } from "../SyntaxStructures/Semantics";
  * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#loop-restoration-process)
  */
 export class MotionFieldMotionVectorStorage {
-  MfRefFrames: REF_FRAME[][];
-  MfMvs: number[][][];
+  MfRefFrames: REF_FRAME[][] = [];
+  MfMvs: number[][][] = [];
 
-  private init: boolean;
   private decoder: AV1Decoder;
 
   constructor(d: AV1Decoder) {
-    this.init = false;
-
-    this.MfRefFrames = [];
-    this.MfMvs = [];
-
     this.decoder = d;
   }
 
-  initialize() {
-    if (this.init) {
-      return;
-    }
-    this.init = true;
-
-    const cis = this.decoder.frameHeaderObu.frameHeader.compute_image_size;
-    const sbRows = cis.MiRows + 32;
-    const sbCols = cis.MiCols + 32;
-
-    this.MfRefFrames = Array2D(sbRows);
-    this.MfMvs = Array3D(sbRows, sbCols);
-  }
+  initialize() {}
 
   /**
    * 7.19 Motion field motion vector storage process
@@ -52,6 +34,8 @@ export class MotionFieldMotionVectorStorage {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const db = tg.decode_block;
 
+    this.MfRefFrames = Array2D(this.MfRefFrames, cis.MiRows);
+    this.MfMvs = Array3D(this.MfMvs, cis.MiRows, cis.MiCols);
     for (let row = 0; row < cis.MiRows; row++) {
       for (let col = 0; col < cis.MiCols; col++) {
         this.MfRefFrames[row][col] = REF_FRAME.NONE;
