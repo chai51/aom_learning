@@ -505,7 +505,8 @@ export class MotionVectorPrediction {
       if (idx < this.NumMvFound) {
         this.WeightStack[idx] += 2;
       } else if (this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
-        this.RefStackMv[this.NumMvFound][0] = candMv;
+        this.RefStackMv = Array3D(this.RefStackMv, this.NumMvFound + 1, 2);
+        this.RefStackMv[this.NumMvFound][0] = clone(candMv);
         this.WeightStack[this.NumMvFound] = 2;
         this.NumMvFound += 1;
       }
@@ -546,8 +547,8 @@ export class MotionVectorPrediction {
       if (idx < this.NumMvFound) {
         this.WeightStack[idx] += 2;
       } else if (this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
-        this.RefStackMv[this.NumMvFound][0] = candMv0;
-        this.RefStackMv[this.NumMvFound][1] = candMv1;
+        this.RefStackMv[this.NumMvFound][0] = clone(candMv0);
+        this.RefStackMv[this.NumMvFound][1] = clone(candMv1);
         this.WeightStack[this.NumMvFound] = 2;
         this.NumMvFound += 1;
       }
@@ -596,7 +597,7 @@ export class MotionVectorPrediction {
     let candSize = db.MiSizes[mvRow][mvCol];
     let large = Number(Math.min(Block_Width[candSize], Block_Height[candSize]) >= 8);
 
-    let candMv;
+    let candMv: number[];
     if ((candMode == Y_MODE.GLOBALMV || candMode == Y_MODE.GLOBAL_GLOBALMV) && gmp.GmType[rf.RefFrame[0]] > TRANSLATION && large == 1) {
       candMv = clone(this.GlobalMvs[0]);
     } else {
@@ -620,7 +621,7 @@ export class MotionVectorPrediction {
     if (idx == this.NumMvFound && this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
       // a.
       this.RefStackMv = Array3D(this.RefStackMv, this.NumMvFound + 1, 2);
-      this.RefStackMv[this.NumMvFound][0] = candMv;
+      this.RefStackMv[this.NumMvFound][0] = clone(candMv);
 
       // b.
       this.WeightStack[this.NumMvFound] = weight;
@@ -669,7 +670,7 @@ export class MotionVectorPrediction {
     if (idx == this.NumMvFound && this.NumMvFound < MAX_REF_MV_STACK_SIZE) {
       // a.
       for (let i = 0; i <= 1; i++) {
-        this.RefStackMv[this.NumMvFound][i] = candMvs[i];
+        this.RefStackMv[this.NumMvFound][i] = clone(candMvs[i]);
       }
 
       // b.
@@ -803,11 +804,11 @@ export class MotionVectorPrediction {
       for (let list = 0; list < 2; list++) {
         let compCount = 0;
         for (let idx = 0; idx < this.RefIdCount[list]; idx++) {
-          combinedMvs[compCount][list] = this.RefIdMvs[list][idx];
+          combinedMvs[compCount][list] = clone(this.RefIdMvs[list][idx]);
           compCount++;
         }
         for (let idx = 0; idx < this.RefDiffCount[list] && compCount < 2; idx++) {
-          combinedMvs[compCount][list] = this.RefDiffMvs[list][idx];
+          combinedMvs[compCount][list] = clone(this.RefDiffMvs[list][idx]);
           compCount++;
         }
         while (compCount < 2) {
@@ -816,19 +817,19 @@ export class MotionVectorPrediction {
         }
       }
       if (this.NumMvFound == 1) {
-        if (combinedMvs[0][0] == this.RefStackMv[0][0] && combinedMvs[0][1] == this.RefStackMv[0][1]) {
-          this.RefStackMv[this.NumMvFound][0] = combinedMvs[1][0];
-          this.RefStackMv[this.NumMvFound][1] = combinedMvs[1][1];
+        if (!listCompare(combinedMvs[0][0], this.RefStackMv[0][0]) && !listCompare(combinedMvs[0][1], this.RefStackMv[0][1])) {
+          this.RefStackMv[this.NumMvFound][0] = clone(combinedMvs[1][0]);
+          this.RefStackMv[this.NumMvFound][1] = clone(combinedMvs[1][1]);
         } else {
-          this.RefStackMv[this.NumMvFound][0] = combinedMvs[0][0];
-          this.RefStackMv[this.NumMvFound][1] = combinedMvs[0][1];
+          this.RefStackMv[this.NumMvFound][0] = clone(combinedMvs[0][0]);
+          this.RefStackMv[this.NumMvFound][1] = clone(combinedMvs[0][1]);
         }
         this.WeightStack[this.NumMvFound] = 2;
         this.NumMvFound++;
       } else {
         for (let idx = 0; idx < 2; idx++) {
-          this.RefStackMv[this.NumMvFound][0] = combinedMvs[idx][0];
-          this.RefStackMv[this.NumMvFound][1] = combinedMvs[idx][1];
+          this.RefStackMv[this.NumMvFound][0] = clone(combinedMvs[idx][0]);
+          this.RefStackMv[this.NumMvFound][1] = clone(combinedMvs[idx][1]);
           this.WeightStack[this.NumMvFound] = 2;
           this.NumMvFound++;
         }
@@ -861,14 +862,14 @@ export class MotionVectorPrediction {
           for (let list = 0; list < 2; list++) {
             let candMv = clone(db.Mvs[mvRow][mvCol][candList]);
             if (candRef == rf.RefFrame[list] && this.RefIdCount[list] < 2) {
-              this.RefIdMvs[list][this.RefIdCount[list]] = candMv;
+              this.RefIdMvs[list][this.RefIdCount[list]] = clone(candMv);
               this.RefIdCount[list]++;
             } else if (this.RefDiffCount[list] < 2) {
               if (fh.RefFrameSignBias[candRef] != fh.RefFrameSignBias[rf.RefFrame[list]]) {
                 candMv[0] *= -1;
                 candMv[1] *= -1;
               }
-              this.RefDiffMvs[list][this.RefDiffCount[list]] = candMv;
+              this.RefDiffMvs[list][this.RefDiffCount[list]] = clone(candMv);
               this.RefDiffCount[list]++;
             }
           }
@@ -890,7 +891,7 @@ export class MotionVectorPrediction {
             }
           }
           if (idx == this.NumMvFound) {
-            this.RefStackMv[idx][0] = candMv;
+            this.RefStackMv[idx][0] = clone(candMv);
             this.WeightStack[idx] = 2;
             this.NumMvFound++;
           }

@@ -1,7 +1,7 @@
 {
   "name": "aom_learning",
   "description": "av1 decoder学习工具",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "keywords": [
     "av1",
     "decoder",

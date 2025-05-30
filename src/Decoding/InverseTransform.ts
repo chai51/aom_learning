@@ -138,7 +138,6 @@ export class InverseTransform {
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#inverse-dct-process)
    */
   inverse_DCT_process(n: number, r: number): void {
-    let T = this.T;
     // 1.
     this.inverse_dct_array_permutation(n);
     // 2.

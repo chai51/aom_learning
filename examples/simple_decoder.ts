@@ -7,7 +7,7 @@ async function run(filename: string) {
   let buf = await fs.readFileSync(filename);
   let yuvFilename = filename.replace(".ivf", ".yuv");
 
-  let reader = new BitReader(undefined as any);
+  let reader = new BitReader(null as any);
   reader.initialize(buf);
 
   const ivfHeader = readIVFHeader(reader);
@@ -16,7 +16,7 @@ async function run(filename: string) {
   let obu = new Obu();
 
   let file = fs.openSync(yuvFilename, "w");
-  obu.onFrame = (frame: number[][][]) => {
+  obu.onFilmGrainFrame = (frame: number[][][]) => {
     index++;
     const planeY = 0;
     const planeU = 1;

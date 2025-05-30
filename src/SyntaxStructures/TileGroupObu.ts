@@ -130,7 +130,6 @@ import {
 const Wiener_Taps_Mid = [3, -7, 15];
 const Sgrproj_Xqd_Mid = [-32, 31];
 const Max_Tx_Depth = [0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 4, 4];
-
 /**
  * 5.11 Tile group OBU syntax
  *
@@ -148,7 +147,9 @@ export class TileGroupObu {
       },
       block_decoded: {},
       decode_partition: {},
-      decode_block: {},
+      decode_block: {
+        PaletteCache: [],
+      },
       intra_frame_mode_info: {
         LeftRefFrame: [],
         AboveRefFrame: [],
@@ -553,6 +554,7 @@ export class TileGroupObu {
     db.SegmentIds = Array2D(db.SegmentIds, r + bh4);
     db.PaletteSizes = Array3D(db.PaletteSizes, 2, r + bh4);
     db.DeltaLFs = Array3D(db.DeltaLFs, r + bh4, c + bw4);
+    db.PaletteColors = Array4D(db.PaletteColors, 2, r + bh4, c + bw4);
     for (let y = 0; y < bh4; y++) {
       for (let x = 0; x < bw4; x++) {
         db.IsInters[r + y][c + x] = ii.is_inter;
@@ -1497,9 +1499,9 @@ export class TileGroupObu {
         compMode = this.get_mode(i);
       }
       if (ifmi.use_intrabc) {
-        m.PredMv[0] = mvp.RefStackMv[0][0];
+        m.PredMv[0] = clone(mvp.RefStackMv[0][0]);
         if (m.PredMv[0][0] == 0 && m.PredMv[0][1] == 0) {
-          m.PredMv[0] = mvp.RefStackMv[1][0];
+          m.PredMv[0] = clone(mvp.RefStackMv[1][0]);
         }
         if (m.PredMv[0][0] == 0 && m.PredMv[0][1] == 0) {
           let sbSize = seqHeader.use_128x128_superblock ? SUB_SIZE.BLOCK_128X128 : SUB_SIZE.BLOCK_64X64;
@@ -1936,7 +1938,7 @@ export class TileGroupObu {
    *
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#transform-block-syntax)
    */
-  transform_block(plane: number, baseX: number, baseY: number, txSz: number, x: number, y: number) {
+  transform_block(plane: number, baseX: number, baseY: number, txSz: TX_SIZE, x: number, y: number) {
     const seqHeader = this.decoder.sequenceHeaderObu.sequenceHeader;
     const cc = seqHeader.color_config;
     const fh = this.decoder.frameHeaderObu.frameHeader;
@@ -2003,8 +2005,8 @@ export class TileGroupObu {
       }
     }
     if (this.decoder.obu.onPredFrame) {
-      let w = 1 << Tx_Width_Log2[txSz];
-      let h = 1 << Tx_Height_Log2[txSz];
+      let w = Tx_Width[txSz];
+      let h = Tx_Height[txSz];
       let pred = Array2D<number>(null, h);
       for (let i = 0; i < h; i++) {
         for (let j = 0; j < w; j++) {
@@ -2160,6 +2162,7 @@ export class TileGroupObu {
     if (all_zero) {
       let c = 0;
       if (plane == 0) {
+        coef.TxTypes = Array2D(coef.TxTypes, y4 + h4);
         for (let i = 0; i < w4; i++) {
           for (let j = 0; j < h4; j++) {
             coef.TxTypes[y4 + j][x4 + i] = DCT_DCT;
@@ -2827,6 +2830,7 @@ export class TileGroupObu {
     let blockWidth = Block_Width[db.MiSize];
     let onscreenHeight = Math.min(blockHeight, (cis.MiRows - db.MiRow) * MI_SIZE);
     let onscreenWidth = Math.min(blockWidth, (cis.MiCols - db.MiCol) * MI_SIZE);
+    pt.ColorMapY = Array2D(pt.ColorMapY, onscreenHeight);
     if (pmi.PaletteSizeY) {
       let color_index_map_y = reader.NS(pmi.PaletteSizeY);
       pt.ColorMapY[0][0] = color_index_map_y;
@@ -2849,6 +2853,7 @@ export class TileGroupObu {
       }
     }
     if (pmi.PaletteSizeUV) {
+      pt.ColorMapUV = Array2D(pt.ColorMapUV, onscreenHeight);
       let color_index_map_uv = reader.NS(pmi.PaletteSizeUV);
       pt.ColorMapUV[0][0] = color_index_map_uv;
       blockHeight = blockHeight >> cc.subsampling_y;
@@ -3379,7 +3384,7 @@ interface TileGroup {
   decode_block: {
     MiRow: number;
     MiCol: number;
-    MiSize: number;
+    MiSize: SUB_SIZE;
     HasChroma: number;
     AvailU: number;
     AvailL: number;

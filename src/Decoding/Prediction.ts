@@ -183,6 +183,10 @@ export class Prediction {
       pred = this.basic_intra_prediction_process(w, h);
     }
 
+    if (this.decoder.obu.onPred) {
+      this.decoder.obu.onPred(plane, x, y, pred);
+    }
+
     /**
      * 解码帧
      */
@@ -200,7 +204,7 @@ export class Prediction {
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#basic-intra-prediction-process)
    */
   basic_intra_prediction_process(w: number, h: number) {
-    let pred: number[][] = new Array(h).fill(0).map((a) => new Array(w));
+    let pred = Array2D<number>(null, h);
 
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
@@ -291,8 +295,6 @@ export class Prediction {
     const tg = this.decoder.tileGroupObu.titleGroup;
     const iai = tg.intra_angle_info;
 
-    let pred: number[][] = new Array(height).fill(0).map((a) => new Array(width));
-
     let angleDelta = 0;
     if (plane == 0) {
       angleDelta = iai.AngleDeltaY;
@@ -352,6 +354,7 @@ export class Prediction {
       dy = null as any;
     }
 
+    let pred = Array2D<number>(null, height);
     if (pAngle < 90) {
       for (let i = 0; i < height; i++) {
         for (let j = 0; j < width; j++) {
@@ -816,7 +819,7 @@ export class Prediction {
     // 4.
     let refList = 0;
 
-    let preds = Array3D<number>(null, 2, h);
+    let preds = Array3D<number>(null, isCompound + 1, h);
     while (true) {
       // 5.
       let refFrame = db.RefFrames[candRow][candCol][refList];
@@ -895,6 +898,11 @@ export class Prediction {
         break;
       }
     }
+    if (this.decoder.obu.onPred) {
+      for (let pred of preds) {
+        this.decoder.obu.onPred(plane, x, y, pred);
+      }
+    }
 
     if (rct.compound_type == COMPOUND_TYPE.COMPOUND_WEDGE && plane == 0) {
       this.wedge_mask(w, h);
@@ -916,6 +924,7 @@ export class Prediction {
         }
       }
     } else if (rct.compound_type == COMPOUND_TYPE.COMPOUND_AVERAGE) {
+      this.CurrFrame = Array3D(this.CurrFrame, 3, y + h);
       for (let i = 0; i < h; i++) {
         for (let j = 0; j < w; j++) {
           this.CurrFrame[plane][y + i][x + j] = Clip1(Round2(preds[0][i][j] + preds[1][i][j], 1 + this.InterPostRound), cc.BitDepth);
@@ -1011,7 +1020,7 @@ export class Prediction {
     const db = tg.decode_block;
     const rfu = this.decoder.referenceFrameUpdate;
 
-    let ref;
+    let ref: number[][][];
     if (refIdx == -1) {
       ref = this.CurrFrame;
     } else {
@@ -1304,7 +1313,7 @@ export class Prediction {
     let vy = mvy * (1 << (WARPEDMODEL_PREC_BITS - 3)) - (midX * this.LocalWarpParams[4] + midY * (this.LocalWarpParams[5] - (1 << WARPEDMODEL_PREC_BITS)));
     this.LocalWarpParams[0] = Clip3(-WARPEDMODEL_TRANS_CLAMP, WARPEDMODEL_TRANS_CLAMP - 1, vx);
     this.LocalWarpParams[1] = Clip3(-WARPEDMODEL_TRANS_CLAMP, WARPEDMODEL_TRANS_CLAMP - 1, vy);
-    // console.info(`${JSON.stringify(this.LocalWarpParams).replace(/\[/g, "{").replace(/\]/g, "}")},`);
+    if (this.decoder.obu.onWmmat) this.decoder.obu.onWmmat(this.LocalWarpParams);
   }
 
   /**
@@ -1685,7 +1694,6 @@ export class Prediction {
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#intra-mode-variant-mask-process)
    */
   intra_mode_variant_mask(w: number, h: number) {
-    const seqHeader = this.decoder.sequenceHeaderObu.sequenceHeader;
     const tg = this.decoder.tileGroupObu.titleGroup;
     const rii = tg.inter_intra;
 
@@ -1761,7 +1769,6 @@ export class Prediction {
    * [av1-spec Reference](https://aomediacodec.github.io/av1-spec/#distance-weights-process)
    */
   distance_weights(candRow: number, candCol: number) {
-    const seqHeader = this.decoder.sequenceHeaderObu.sequenceHeader;
     const fho = this.decoder.frameHeaderObu;
     const fh = fho.frameHeader;
     const tg = this.decoder.tileGroupObu.titleGroup;
@@ -1836,21 +1843,12 @@ export class Prediction {
       map = pt.ColorMapY;
     }
 
+    this.CurrFrame = Array3D(this.CurrFrame, 3, startY + h);
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
         this.CurrFrame[plane][startY + i][startX + j] = palette[map[y * 4 + i][x * 4 + j]];
       }
     }
-
-    // if (this.decoder.obu.onPredFrame) {
-    //   let pred: number[][] = Array2D(h);
-    //   for (let i = 0; i < h; i++) {
-    //     for (let j = 0; j < w; j++) {
-    //       pred[i][j] = this.CurrFrame[plane][startY + i][startX + j];
-    //     }
-    //   }
-    //   this.decoder.obu.onPredFrame(plane, startX, startY, pred);
-    // }
   }
 
   /**

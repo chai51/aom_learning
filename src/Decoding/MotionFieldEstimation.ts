@@ -1,4 +1,4 @@
-import { Array2D, Array3D, Array4D, Clip3, Round2Signed } from "../Conventions";
+import { Array2D, Array3D, Array4D, Clip3, clone, Round2Signed } from "../Conventions";
 import {
   MAX_FRAME_DISTANCE,
   MAX_OFFSET_HEIGHT,
@@ -138,7 +138,7 @@ export class MotionFieldEstimation {
               for (let dst = REF_FRAME.LAST_FRAME; dst <= REF_FRAME.ALTREF_FRAME; dst++) {
                 let refToDst = fho.get_relative_dist(fh.OrderHint, fh.OrderHints[dst]);
                 projMv = this.get_mv_projection(mv, refToDst, refOffset);
-                this.MotionFieldMvs[dst][this.PosY8][this.PosX8] = projMv;
+                this.MotionFieldMvs[dst][this.PosY8][this.PosX8] = clone(projMv);
               }
             }
           }
@@ -171,11 +171,6 @@ export class MotionFieldEstimation {
    */
   get_block_position(x8: number, y8: number, dstSign: number, projMv: number[]) {
     const fh = this.decoder.frameHeaderObu.frameHeader;
-    const rfm = fh.reference_frame_marking;
-    const fs = fh.frame_size;
-    const rs = fh.render_size;
-    const fswr = fh.frame_size_with_refs;
-    const sp = fh.superres_params;
     const cis = fh.compute_image_size;
 
     let data = { posValid: 1 };

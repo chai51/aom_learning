@@ -37,12 +37,17 @@ export class Obu extends EventEmitter {
   obuHeader: ObuHeader;
   private decoder: AV1Decoder;
 
-  // 最终帧/胶片颗粒帧
-  onFrame?: (frame: number[][][]) => void;
-  // 预测帧
-  onPredFrame?: (plane: number, startX: number, startY: number, frame: number[][]) => void;
+  // 胶片颗粒帧
+  onFilmGrainFrame?: (frame: number[][][]) => void;
   // 残差帧
   onResidualFrame?: (plane: number, startX: number, startY: number, frame: number[][]) => void;
+  // 预测帧
+  onPredFrame?: (plane: number, startX: number, startY: number, frame: number[][]) => void;
+  onPred?: (plane: number, startX: number, startY: number, pred: number[][]) => void;
+
+  onWmmat?: (wmmat: number[]) => void;
+  onSymbol?: (value: number[]) => void;
+  onCdf?: (cdf: number[]) => void;
 
   constructor() {
     super();
@@ -96,9 +101,9 @@ export class Obu extends EventEmitter {
       sz -= obu_length;
     }
 
-    if (obu.onFrame) {
+    if (obu.onFilmGrainFrame) {
       let ct = this.decoder.output.cameraTile;
-      obu.onFrame([ct.OutY, ct.OutU, ct.OutV]);
+      obu.onFilmGrainFrame([ct.OutY, ct.OutU, ct.OutV]);
     }
   }
 

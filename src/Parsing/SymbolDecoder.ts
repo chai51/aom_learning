@@ -166,6 +166,7 @@ export class SymbolDecoder {
       // 7.
       this.SymbolMaxBits = this.SymbolMaxBits - bits;
     }
+    if (this.decoder.obu.onSymbol) this.decoder.obu.onSymbol([this.SymbolRange]);
 
     if (fh.disable_cdf_update == 0 && (data == undefined || data.cdf_update != false)) {
       let rate = 3 + Number(cdf[N] > 15) + Number(cdf[N] > 31) + Math.min(FloorLog2(N), 2);
@@ -181,7 +182,7 @@ export class SymbolDecoder {
         }
       }
       cdf[N] += Number(cdf[N] < 32);
-      // console.info(`${JSON.stringify(cdf).replace(/\[/g, "{").replace(/\]/g, "}")},`);
+      if (this.decoder.obu.onCdf) this.decoder.obu.onCdf(cdf);
     }
     return symbol;
   }

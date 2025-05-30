@@ -1868,7 +1868,7 @@ export class FrameHeaderObu {
     const rfl = this.decoder.referenceFrameLoading;
 
     let prevFrame = fh.ref_frame_idx[fh.primary_ref_frame];
-    psi.PrevGmParams = psi.SavedGmParams[prevFrame];
+    psi.PrevGmParams = clone(psi.SavedGmParams[prevFrame]);
     rfl.load_loop_filter_params(prevFrame);
     rfl.load_segmentation_params(prevFrame);
   }
